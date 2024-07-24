@@ -1,6 +1,7 @@
 **__pycache__
 experiments/
 lightning_logs/
+*.npz*
 **.nfs*
 **build
 **dist

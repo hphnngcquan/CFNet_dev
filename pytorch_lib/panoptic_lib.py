@@ -186,7 +186,7 @@ class PointVoteNMS(nn.Module):
         self.score_thresh = float(self.point_nms_dic['score_thresh'])
         print('pv nms params: ', self.point_nms_dic)
     
-    def forward(self, pcds_xyz, pred_sem, pred_offset, pred_hmap):
+    def forward(self, pcds_xyz, pred_sem, pred_offset, pred_hmap, generate_label=False):
         '''
         Input:
             pcds_xyz, (N, C), C -> (x, y, z, intensity, ...)

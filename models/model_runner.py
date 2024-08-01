@@ -221,19 +221,19 @@ class ModelRunnerSemKITTI(trainer.ADDistTrainer):
             pred_obj_center, pred_panoptic = self.pv_nms(pcds_xyzi[0, 0, :3, :, 0].T.contiguous(), pred_sem, pred_offset, pred_hmap)
             pred_panoptic = pred_panoptic.cpu().numpy().astype(np.uint32)
             
-            pred_panoptic_list.append(pred_panoptic)
-            sem_pred_panoptic = pred_panoptic & 0xFFFF
-            ins_pred_panoptic = pred_panoptic >> 16
+            # pred_panoptic_list.append(pred_panoptic)
+            # sem_pred_panoptic = pred_panoptic & 0xFFFF
+            # ins_pred_panoptic = pred_panoptic >> 16
             
-            pred_panoptic_use = utils.relabel(sem_pred_panoptic, self.task_cfg['learning_map_inv'])
-            pred_panoptic_save = (ins_pred_panoptic << 16) + pred_panoptic_use
+            # pred_panoptic_use = utils.relabel(sem_pred_panoptic, self.task_cfg['learning_map_inv'])
+            # pred_panoptic_save = (ins_pred_panoptic << 16) + pred_panoptic_use
             
-            output_path = os.path.join("output", "sequences", seq_id[0], "predictions")
-            if not os.path.exists(output_path):
-                os.system("mkdir -p {}".format(output_path))
+            # output_path = os.path.join("output", "sequences", seq_id[0], "predictions")
+            # if not os.path.exists(output_path):
+            #     os.system("mkdir -p {}".format(output_path))
             
-            pcd_name = os.path.join(output_path, os.path.basename(fn[0]).replace('.bin', '.label'))
-            pred_panoptic_save.reshape(-1).astype(np.uint32).tofile(pcd_name)
+            # pcd_name = os.path.join(output_path, os.path.basename(fn[0]).replace('.bin', '.label'))
+            # pred_panoptic_save.reshape(-1).astype(np.uint32).tofile(pcd_name)
             
         
         pred_panoptic_list = np.stack(pred_panoptic_list, axis=0)
@@ -277,3 +277,35 @@ class ModelRunnerSemKITTI(trainer.ADDistTrainer):
             
             with open(os.path.join(self.test_save_path, "metric.yaml"), "w") as f:
                 yaml.dump(record_dic, f)
+                
+    @torch.no_grad()
+    def predict_step(self, batch_idx, batch):
+        pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset, pano_label, seq_id, fn = batch
+
+        pano_label = pano_label.cpu().numpy().astype(np.uint32)[0]
+        pred_list = self.model(pcds_xyzi.squeeze(0), pcds_coord.squeeze(0), pcds_sphere_coord.squeeze(0))
+
+        pred_panoptic_list = []
+        for (pred_sem, pred_offset, pred_hmap) in pred_list:
+            pred_sem = F.softmax(pred_sem, dim=1).mean(dim=0).permute(2, 1, 0).contiguous()[0]
+            pred_offset = merge_offset_tta(pred_offset)
+            pred_hmap = pred_hmap.mean(dim=0).squeeze(1)
+
+            # make result
+            pred_obj_center, pred_panoptic = self.pv_nms(pcds_xyzi[0, 0, :3, :, 0].T.contiguous(), pred_sem, pred_offset, pred_hmap)
+            pred_panoptic = pred_panoptic.cpu().numpy().astype(np.uint32)
+            
+            pred_panoptic_list.append(pred_panoptic)
+            sem_pred_panoptic = pred_panoptic & 0xFFFF
+            ins_pred_panoptic = pred_panoptic >> 16
+            
+            pred_panoptic_use = utils.relabel(sem_pred_panoptic, self.task_cfg['learning_map_inv'])
+            pred_panoptic_save = (ins_pred_panoptic << 16) + pred_panoptic_use
+            
+            output_path = os.path.join("output", "sequences", seq_id[0], "predictions")
+            if not os.path.exists(output_path):
+                os.system("mkdir -p {}".format(output_path))
+            
+            pcd_name = os.path.join(output_path, os.path.basename(fn[0]).replace('.bin', '.label'))
+            pred_panoptic_save.reshape(-1).astype(np.uint32).tofile(pcd_name)
+        

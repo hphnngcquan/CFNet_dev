@@ -268,9 +268,8 @@ class ModelRunnerSemKITTI(trainer.ADDistTrainer):
                 
     @torch.no_grad()
     def predict_step(self, batch_idx, batch):
-        pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset, pano_label, seq_id, fn = batch
+        pcds_xyzi, pcds_coord, pcds_sphere_coord, seq_id, fn = batch
 
-        pano_label = pano_label.cpu().numpy().astype(np.uint32)[0]
         pred_list = self.model(pcds_xyzi.squeeze(0), pcds_coord.squeeze(0), pcds_sphere_coord.squeeze(0))
 
         pred_panoptic_list = []

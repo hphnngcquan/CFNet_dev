@@ -26,7 +26,9 @@
                      "--nnodes", "1", "--nproc_per_node", "1",
                      "predict.py",
                      "--config", "config/semantickitti/config_mvfcev2ctx_adam_wce_lossv2_single.py", "--precision", "fp32", "--resume_ckpt",
-                     "/media/anda/hdd/HPNQuan/repo/CFNet_dev/experiments/semantickitti/config_mvfcev2ctx_adam_wce_lossv2_single/version_1/checkpoints/epoch=27-metric=0.64899846.cpkt"]
+                     "/media/anda/hdd/HPNQuan/repo/CFNet_dev/experiments/semantickitti/config_mvfcev2ctx_adam_wce_lossv2_single/version_1/checkpoints/epoch=27-metric=0.64899846.cpkt",
+                     "--test",
+                    ]
         }
     ]
 }

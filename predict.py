@@ -28,18 +28,28 @@ def main(args, config):
 
     prefix = pGen.name
     trainer.init_env(seed=5120)
-
-    # define dataloader
-    val_dataset = get_module(type=pDataset.Val.type, config=pDataset.Val)
-    val_sampler = DistributedSampler(val_dataset)
-    val_loader = DataLoader(val_dataset,
-                            batch_size=1,
-                            shuffle=(val_sampler is None),
-                            num_workers=pDataset.Val.num_workers,
-                            sampler=val_sampler,
-                            pin_memory=True,
-                            prefetch_factor=2,
-                            persistent_workers=True)
+    if args.test == False:
+        # define dataloader
+        val_dataset = get_module(type=pDataset.Val.type, config=pDataset.Val)
+        val_sampler = DistributedSampler(val_dataset)
+        loader = DataLoader(val_dataset,
+                                batch_size=1,
+                                shuffle=(val_sampler is None),
+                                num_workers=pDataset.Val.num_workers,
+                                sampler=val_sampler,
+                                pin_memory=True,
+                                prefetch_factor=2,
+                                persistent_workers=True)
+    else:
+        # define dataloader
+        test_dataset = get_module(type=pDataset.Test.type, config=pDataset.Test)
+        loader = DataLoader(test_dataset,
+                                batch_size=1,
+                                shuffle=False,
+                                num_workers=pDataset.Test.num_workers,
+                                pin_memory=True,
+                                prefetch_factor=2,
+                                persistent_workers=True)
     
     # define model
     model = get_module(type=pModel.type, pModel=pModel)
@@ -49,7 +59,7 @@ def main(args, config):
         sync_batchnorm=False,
         test_save_path=os.path.splitext(args.resume_ckpt)[0]
     )
-    model_trainer.predict(model, dataloader=val_loader, ckpt_path=args.resume_ckpt)
+    model_trainer.predict(model, dataloader=loader, ckpt_path=args.resume_ckpt)
 
 
 if __name__ == '__main__':
@@ -58,6 +68,7 @@ if __name__ == '__main__':
     parser.add_argument('--precision', help='precision of the float number', type=str, default="fp32")
 
     parser.add_argument('--resume_ckpt', help='resume checkpoint', type=str, default=None)
+    parser.add_argument('--test', help='use test set', default=False, required=False, action='store_true')
 
     args = parser.parse_args()
     config = importlib.import_module(args.config.replace('.py', '').replace('/', '.'))

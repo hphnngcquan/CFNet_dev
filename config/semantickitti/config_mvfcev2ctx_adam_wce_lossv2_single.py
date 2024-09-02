@@ -50,6 +50,14 @@ def get_config():
             SeqDir = General.SeqDir
             Voxel = General.Voxel
             center_type = General.center_type
+        
+        class Test:
+            type = 'datasets.data.DataloadTest'
+            num_workers = 8
+            frame_point_num = 130000
+            SeqDir = General.SeqDir
+            Voxel = General.Voxel
+            center_type = General.center_type
     
     class ModelParam:
         type = "models.cfnet.CFNet"

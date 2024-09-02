@@ -16,12 +16,14 @@ Official code for CFNet
 #### 1 Dependency
 
 ```bash
-CUDA>=11.1
-Pytorch>=1.10.0
-PyYAML>=6.0.0
-scipy
-
-pip3 install -r requirements.txt
+conda create -n quan_cfnet python=3.9.19
+conda activate quan_cfnet
+pip install torch==2.3.1 torchvision==0.18.1 --index-url https://download.pytorch.org/whl/cu118
+pip install PyYAML==6.0.2
+pip install scipy==1.13.1
+pip install pytorch-lightning==2.4.0
+pip install gdown==5.2.0
+pip install pytz==2024.1
 ```
 
 #### 2 Training Process

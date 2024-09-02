@@ -9,3 +9,5 @@ lightning_logs/
 Pipfile
 .venv/
 *.label
+.mypy_cache/
+data/

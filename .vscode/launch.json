@@ -8,25 +8,25 @@
             "name": "evaluate",
             "type": "debugpy",
             "request": "launch",
-            "program": "/home/anda/anaconda3/envs/cfnet/bin/torchrun",
+            "program": "/home/anda/anaconda3/envs/quan_cfnet/bin/torchrun",
             "console": "integratedTerminal",
             "args": [
                      "--nnodes", "1", "--nproc_per_node", "1",
                      "evaluate.py",
                      "--config", "config/semantickitti/config_mvfcev2ctx_adam_wce_lossv2_single.py", "--precision", "fp32", "--resume_ckpt",
-                     "/media/anda/vm/hpnquan/CFNet/experiments/semantickitti/config_mvfcev2ctx_adam_wce_lossv2_single/version_1/checkpoints/epoch=27-metric=0.64899846.cpkt"]
+                     "/media/anda/hdd/HPNQuan/repo/CFNet_dev/experiments/semantickitti/config_mvfcev2ctx_adam_wce_lossv2_single/version_1/checkpoints/epoch=27-metric=0.64899846.cpkt"]
         },
         {
             "name": "predict",
             "type": "debugpy",
             "request": "launch",
-            "program": "/home/anda/anaconda3/envs/cfnet/bin/torchrun",
+            "program": "/home/anda/anaconda3/envs/quan_cfnet/bin/torchrun",
             "console": "integratedTerminal",
             "args": [
                      "--nnodes", "1", "--nproc_per_node", "1",
                      "predict.py",
                      "--config", "config/semantickitti/config_mvfcev2ctx_adam_wce_lossv2_single.py", "--precision", "fp32", "--resume_ckpt",
-                     "/media/anda/vm/hpnquan/CFNet/experiments/semantickitti/config_mvfcev2ctx_adam_wce_lossv2_single/version_1/checkpoints/epoch=27-metric=0.64899846.cpkt"]
+                     "/media/anda/hdd/HPNQuan/repo/CFNet_dev/experiments/semantickitti/config_mvfcev2ctx_adam_wce_lossv2_single/version_1/checkpoints/epoch=27-metric=0.64899846.cpkt"]
         }
     ]
 }

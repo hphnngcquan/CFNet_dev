@@ -221,19 +221,7 @@ class ModelRunnerSemKITTI(trainer.ADDistTrainer):
             pred_obj_center, pred_panoptic = self.pv_nms(pcds_xyzi[0, 0, :3, :, 0].T.contiguous(), pred_sem, pred_offset, pred_hmap)
             pred_panoptic = pred_panoptic.cpu().numpy().astype(np.uint32)
             
-            # pred_panoptic_list.append(pred_panoptic)
-            # sem_pred_panoptic = pred_panoptic & 0xFFFF
-            # ins_pred_panoptic = pred_panoptic >> 16
-            
-            # pred_panoptic_use = utils.relabel(sem_pred_panoptic, self.task_cfg['learning_map_inv'])
-            # pred_panoptic_save = (ins_pred_panoptic << 16) + pred_panoptic_use
-            
-            # output_path = os.path.join("output", "sequences", seq_id[0], "predictions")
-            # if not os.path.exists(output_path):
-            #     os.system("mkdir -p {}".format(output_path))
-            
-            # pcd_name = os.path.join(output_path, os.path.basename(fn[0]).replace('.bin', '.label'))
-            # pred_panoptic_save.reshape(-1).astype(np.uint32).tofile(pcd_name)
+            pred_panoptic_list.append(pred_panoptic)
             
         
         pred_panoptic_list = np.stack(pred_panoptic_list, axis=0)

@@ -17,6 +17,8 @@ import os
 
 import pdb
 
+offset_loss_raw = []
+offset_loss = []
 
 if hasattr(torch.optim.lr_scheduler, "LRScheduler"):
     setattr(torch.optim.lr_scheduler, "_LRScheduler", torch.optim.lr_scheduler.LRScheduler)
@@ -210,9 +212,20 @@ class ModelRunnerSemKITTI(trainer.ADDistTrainer):
 
         pano_label = pano_label.cpu().numpy().astype(np.uint32)[0]
         pred_list = self.model(pcds_xyzi.squeeze(0), pcds_coord.squeeze(0), pcds_sphere_coord.squeeze(0))
+        
+        pc_offset_weight = get_fg_pc_offset_weight(pcds_ins_label[0])
 
         pred_panoptic_list = []
-        for (pred_sem, pred_offset, pred_hmap) in pred_list:
+        
+        for i, (pred_sem, pred_offset, pred_hmap) in enumerate(pred_list):
+            # calculate offset loss
+            loss_point = (pred_offset - pcds_offset[0]).pow(2).sum(dim=2, keepdim=True).sqrt() #(BS, N, 1)
+            loss_offset = (loss_point).mean()
+            if i == 0:
+                offset_loss.append(loss_offset)
+            if i == 1:
+                offset_loss_raw.append(loss_offset)
+            
             pred_sem = F.softmax(pred_sem, dim=1).mean(dim=0).permute(2, 1, 0).contiguous()[0]
             pred_offset = merge_offset_tta(pred_offset)
             pred_hmap = pred_hmap.mean(dim=0).squeeze(1)
@@ -262,7 +275,8 @@ class ModelRunnerSemKITTI(trainer.ADDistTrainer):
                 metric_pano = criterion_pano_list[i].get_metric()
                 for key in metric_pano:
                     record_dic["{}_{}".format(key, i)] = metric_pano[key]
-            
+            record_dic["offset_loss"] = (sum(offset_loss) / len(offset_loss)).item()
+            record_dic["offset_loss_raw"] = (sum(offset_loss_raw) / len(offset_loss_raw)).item()            
             with open(os.path.join(self.test_save_path, "metric.yaml"), "w") as f:
                 yaml.dump(record_dic, f)
                 
@@ -296,3 +310,19 @@ class ModelRunnerSemKITTI(trainer.ADDistTrainer):
             pcd_name = os.path.join(output_path, os.path.basename(fn[0]).replace('.bin', '.label'))
             pred_panoptic_save.reshape(-1).astype(np.uint32).tofile(pcd_name)
         
+
+
+def get_fg_pc_offset_weight(gt_ins_label):
+        BS = gt_ins_label.shape[0]
+        N = gt_ins_label.shape[1]
+
+        if gt_ins_label.max() >= 0:
+            per_obj_num = pytorch_lib.VoxelSum(pcds_ind=gt_ins_label.view(BS, N, 1, 1), output_size=(int(gt_ins_label.max()) + 1,)).float().unsqueeze(1) #(BS, 1, K)
+            obj_sum = int((per_obj_num > 0).sum())
+            per_obj_weight = 1 / (per_obj_num * obj_sum + 1e-12) #(BS, 1, K)
+
+            pc_offset_weight = pytorch_lib.VoxelQuery(voxel_in=per_obj_weight, pcds_ind=gt_ins_label.view(BS, N, 1, 1)).squeeze(1) #(BS, N, 1)
+            return pc_offset_weight
+        else:
+            pc_offset_weight = torch.zeros_like(gt_ins_label).float()
+            return pc_offset_weight

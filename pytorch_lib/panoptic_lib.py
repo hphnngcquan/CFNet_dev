@@ -10,6 +10,7 @@ import pan_lib.cuda_kernel
 import copy
 
 import pdb
+from datasets.utils import draw_point_with
 
 
 # pcds_feat, (BS, C, N, 1)

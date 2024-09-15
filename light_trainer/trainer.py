@@ -15,6 +15,7 @@ from tqdm import tqdm
 import os
 
 from .recorder import base_recorder
+from torch.utils.tensorboard import SummaryWriter
 
 import pdb
 
@@ -109,6 +110,7 @@ class ADDistTrainer:
         clip_grad_norm_type: int = 2,
         detect_anomaly: bool = False,
         sync_batchnorm: bool = False,
+        tb_logger = None,
         **kwargs):
         # capture arguments to provide to context
         assert precision in ["fp32", "fp16", "bf16"], "'precision' must be fp32, fp16, or bf16, but got {}".format(precision)
@@ -125,7 +127,9 @@ class ADDistTrainer:
             self.float16_type = torch.float16
         elif precision == "bf16":
             self.float16_type = torch.bfloat16
-        
+        if tb_logger != None:
+            self.tb_logger = tb_logger
+            self.tb_step = 0
         self.build_env()
         self.build_training_prop()
 
@@ -299,6 +303,7 @@ class ADDistTrainer:
 
         # resume from checkpoint
         if ckpt_path is not None:
+            print("Resume from checkpoint: {}".format(ckpt_path))
             self.resume_from_checkpoint(ckpt_path)
         
         # logger model, optimizer, scheduler
@@ -342,6 +347,8 @@ class ADDistTrainer:
                 for batch_idx, batch in loop:
                     with torch.cuda.amp.autocast(enabled=self.enable_fp16, cache_enabled=self.enable_fp16, dtype=self.float16_type):
                         loss = self.training_step(batch_idx, attach_input_device(batch))
+                        self.tb_logger.add_scalar("Epoch", self.epoch_idx, self.tb_step)
+                        self.tb_logger.add_scalar("Loss/step", loss, self.tb_step)
                     
                     if loss is not None:
                         assert (isinstance(loss, torch.Tensor) and loss.numel() == 1)
@@ -357,6 +364,7 @@ class ADDistTrainer:
                     
                     self.global_step_idx += 1
                     self.step_idx += 1
+                    self.tb_step += 1
             
             # training epoch end
             self.sync_all_process()
@@ -384,6 +392,7 @@ class ADDistTrainer:
                     # validation epoch end
                     self.sync_all_process()
                     metric = self.validation_epoch_end()
+                    self.tb_logger.add_scalar("PQ_metric/epoch", metric, self.epoch_idx)
                     self.sync_all_process()
                     assert isinstance(metric, (int, float))
                     fname_ckpt = self.recorder.record_checkpoint(metric, self.epoch_idx)

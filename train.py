@@ -14,13 +14,14 @@ from light_trainer import trainer, recorder
 import argparse
 import importlib
 
+# init tensorboard
+from torch.utils.tensorboard import SummaryWriter
 
 import torch.backends.cudnn as cudnn
 cudnn.deterministic = True
 cudnn.benchmark = False
 
 import pdb
-
 
 def save_dataset(dataloader):
     import pickle as pkl
@@ -90,6 +91,8 @@ def main(args, config):
         save_topk_model=5,
         mode='max')
     
+    tb_logger = SummaryWriter(txt_recorder.log_dir)
+    
     model = get_module(type=pModel.type, pModel=pModel)
     model_trainer = eval(pModel.runner_type)(
         recorder=txt_recorder,
@@ -98,7 +101,8 @@ def main(args, config):
         log_every_n_steps=args.log_frequency,
         sync_batchnorm=True,
         pModel=pModel,
-        per_epoch_num_iters=len(train_loader)
+        per_epoch_num_iters=len(train_loader),
+        tb_logger=tb_logger,
     )
     if (args.pretrain_model != None) and (os.path.exists(args.pretrain_model)):
         print('Load pretrain model: {}'.format(args.pretrain_model))

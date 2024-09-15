@@ -109,7 +109,7 @@ class CFNet(nn.Module):
             pred_hmap (BS, N, 1)
         '''
         pcds_coord_wl = pcds_coord[:, :, :2].contiguous()
-        point_feat_tmp = self.point_pre(pcds_xyzi)
+        point_feat_tmp = self.point_pre(pcds_xyzi) #c = 64
 
         # BEV network
         bev_input = self.point2bev(point_feat_tmp, pcds_coord_wl)

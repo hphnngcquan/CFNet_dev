@@ -51,6 +51,7 @@ class DataloadTrain(Dataset):
         self.align = config.align_used
         if self.align:
             self.pose = {}
+            self.n_past_pcls = config.n_past_pcls
         self.Voxel = config.Voxel
         with open('datasets/semantic-kitti.yaml', 'r') as f:
             self.task_cfg = yaml.safe_load(f)
@@ -158,11 +159,11 @@ class DataloadTrain(Dataset):
 
     def __getitem__(self, index):
         fname_pcds, fname_labels, seq_id, fn = self.flist[index]
-
+        mapping_mat = []
         #load point clouds and label file
         pcds = np.fromfile(fname_pcds, dtype=np.float32)
         pcds = pcds.reshape((-1, 4))
-
+        mapping_mat.append(pcds.shape[0])
         pcds_label = np.fromfile(fname_labels, dtype=np.uint32)
         pcds_label = pcds_label.reshape((-1))
 
@@ -171,6 +172,30 @@ class DataloadTrain(Dataset):
 
         pcds_label_use = utils.relabel(sem_label, self.task_cfg['learning_map'])
         pcds_ins_label = utils.gene_ins_label(pcds_label_use, inst_label)
+        
+        # prev pcls
+        if self.align and (int(fn[:-4]) > 0):
+            scan_idx = index
+            from_idx = scan_idx - self.n_past_pcls
+            prev_pcds_list = []
+            prev_pcds_label_use_list = []
+            prev_pcds_ins_label_list = []
+            for i, list in enumerate(self.flist[from_idx : scan_idx]):
+                fname_pcds_prev, fname_labels_prev, seq_id_prev, fn_prev = list
+                if seq_id_prev != seq_id:
+                    continue
+                pcds_prev = np.fromfile(fname_pcds_prev, dtype=np.float32).reshape((-1,4))
+                pcds_label_prev = np.fromfile(fname_labels_prev, dtype=np.uint32).reshape((-1))
+                prev_sem_label = pcds_label_prev & 0xFFFF
+                prev_inst_label = pcds_label_prev >> 16
+                
+                prev_pcds_label_use_list.append(utils.relabel(prev_sem_label, self.task_cfg['learning_map']))
+                prev_pcds_ins_label_list.append(utils.gene_ins_label(prev_pcds_label_use_list[-1], prev_inst_label))
+                
+                prev_pcds_list.append(pcds_prev)
+
+            
+            
         
         # copy-paste augmentation
         if self.cp_aug is not None:

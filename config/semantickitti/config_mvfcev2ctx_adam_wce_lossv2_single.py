@@ -1,7 +1,7 @@
 import numpy as np
 import os
 from functools import reduce
-
+n_past_steps = 2
 
 def get_config():
     class General:
@@ -30,6 +30,7 @@ def get_config():
             num_workers = 8
             frame_point_num = 130000
             align_used = True
+            n_past_pcls = n_past_steps
             SeqDir = General.SeqDir
             Voxel = General.Voxel
             center_type = General.center_type
@@ -49,6 +50,7 @@ def get_config():
             num_workers = 8
             frame_point_num = 130000
             align_used = True
+            n_past_pcls = n_past_steps
             SeqDir = General.SeqDir
             Voxel = General.Voxel
             center_type = General.center_type
@@ -58,6 +60,7 @@ def get_config():
             num_workers = 8
             frame_point_num = 130000
             align_used = True
+            n_past_pcls = n_past_steps
             SeqDir = General.SeqDir
             Voxel = General.Voxel
             center_type = General.center_type

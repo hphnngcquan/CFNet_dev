@@ -29,6 +29,7 @@ def get_config():
             type = 'datasets.data.DataloadTrain'
             num_workers = 8
             frame_point_num = 130000
+            align_used = True
             SeqDir = General.SeqDir
             Voxel = General.Voxel
             center_type = General.center_type
@@ -47,6 +48,7 @@ def get_config():
             type = 'datasets.data.DataloadVal'
             num_workers = 8
             frame_point_num = 130000
+            align_used = True
             SeqDir = General.SeqDir
             Voxel = General.Voxel
             center_type = General.center_type
@@ -55,6 +57,7 @@ def get_config():
             type = 'datasets.data.DataloadTest'
             num_workers = 8
             frame_point_num = 130000
+            align_used = True
             SeqDir = General.SeqDir
             Voxel = General.Voxel
             center_type = General.center_type

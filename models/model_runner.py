@@ -7,6 +7,7 @@ import pickle as pkl
 
 from utils.config_parser import get_module, class2dic, class2dic_iterative
 from .model_utils import builder, metric
+from .model_utils.gen_shiftedkitti import gen_offsetkitti
 from light_trainer import trainer
 import pytorch_lib
 from datasets import utils
@@ -282,18 +283,23 @@ class ModelRunnerSemKITTI(trainer.ADDistTrainer):
                 
     @torch.no_grad()
     def predict_step(self, batch_idx, batch):
+        generate_offset = False
         pcds_xyzi, pcds_coord, pcds_sphere_coord, seq_id, fn = batch
 
         pred_list = self.model(pcds_xyzi.squeeze(0), pcds_coord.squeeze(0), pcds_sphere_coord.squeeze(0))
 
         pred_panoptic_list = []
-        for (pred_sem, pred_offset, pred_hmap) in pred_list:
+        for i, (pred_sem, pred_offset, pred_hmap) in enumerate(pred_list):
             pred_sem = F.softmax(pred_sem, dim=1).mean(dim=0).permute(2, 1, 0).contiguous()[0]
             pred_offset = merge_offset_tta(pred_offset)
             pred_hmap = pred_hmap.mean(dim=0).squeeze(1)
 
             # make result
             pred_obj_center, pred_panoptic = self.pv_nms(pcds_xyzi[0, 0, :3, :, 0].T.contiguous(), pred_sem, pred_offset, pred_hmap)
+            if i == 0 and  generate_offset:
+                assert pred_offset.shape[0] == pcds_xyzi.shape[3]
+                pred_offset_save = pred_offset * (pred_hmap.unsqueeze(1) > self.pModel.score_thresh).float()
+                gen_offsetkitti(pred_offset_save, seq_id[0], fn)
             pred_panoptic = pred_panoptic.cpu().numpy().astype(np.uint32)
             
             pred_panoptic_list.append(pred_panoptic)

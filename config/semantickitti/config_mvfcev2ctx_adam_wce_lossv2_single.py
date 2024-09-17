@@ -8,6 +8,7 @@ def get_config():
         name = reduce(lambda x,y:os.path.join(x,y), __name__.rsplit("/")[-1].split('.')[1:])
         batch_size_per_gpu = 2
 
+        OffsetDir = './data/OffsetKITTI/dataset/sequences'
         SeqDir = './data/SemanticKITTI/dataset/sequences'
         category_list = ['car', 'bicycle', 'motorcycle', 'truck', 'other-vehicle', 'person', 'bicyclist', 'motorcyclist',
                         'road', 'parking', 'sidewalk', 'other-ground', 'building', 'fence', 'vegetation', 'trunk',
@@ -31,6 +32,7 @@ def get_config():
             frame_point_num = 130000
             align_used = True
             n_past_pcls = n_past_steps
+            OffsetDir = General.OffsetDir
             SeqDir = General.SeqDir
             Voxel = General.Voxel
             center_type = General.center_type
@@ -51,6 +53,7 @@ def get_config():
             frame_point_num = 130000
             align_used = True
             n_past_pcls = n_past_steps
+            OffsetDir = General.OffsetDir
             SeqDir = General.SeqDir
             Voxel = General.Voxel
             center_type = General.center_type
@@ -61,6 +64,7 @@ def get_config():
             frame_point_num = 130000
             align_used = True
             n_past_pcls = n_past_steps
+            OffsetDir = General.OffsetDir
             SeqDir = General.SeqDir
             Voxel = General.Voxel
             center_type = General.center_type

@@ -13,6 +13,8 @@ import json
 from . import utils, copy_paste
 import os
 
+from .utils import draw_point_with
+
 
 def make_point_feat(pcds_xyzi, pcds_coord, pcds_sphere_coord, Voxel):
     # make point feat
@@ -49,6 +51,7 @@ class DataloadTrain(Dataset):
         self.config = config
         self.frame_point_num = config.frame_point_num
         self.align = config.align_used
+        self.offset_dir = config.OffsetDir
         if self.align:
             self.pose = {}
             self.n_past_pcls = config.n_past_pcls
@@ -173,7 +176,7 @@ class DataloadTrain(Dataset):
         pcds_label_use = utils.relabel(sem_label, self.task_cfg['learning_map'])
         pcds_ins_label = utils.gene_ins_label(pcds_label_use, inst_label)
         
-        # prev pcls
+        # prev pcls and shifted
         if self.align and (int(fn[:-4]) > 0):
             scan_idx = index
             from_idx = scan_idx - self.n_past_pcls
@@ -184,6 +187,7 @@ class DataloadTrain(Dataset):
                 fname_pcds_prev, fname_labels_prev, seq_id_prev, fn_prev = list
                 if seq_id_prev != seq_id:
                     continue
+                
                 pcds_prev = np.fromfile(fname_pcds_prev, dtype=np.float32).reshape((-1,4))
                 pcds_label_prev = np.fromfile(fname_labels_prev, dtype=np.uint32).reshape((-1))
                 prev_sem_label = pcds_label_prev & 0xFFFF
@@ -193,8 +197,13 @@ class DataloadTrain(Dataset):
                 prev_pcds_ins_label_list.append(utils.gene_ins_label(prev_pcds_label_use_list[-1], prev_inst_label))
                 
                 prev_pcds_list.append(pcds_prev)
-
-            
+                
+                if (int(fn_prev[:-4]) + 1) == int(fn[:-4]):
+                    offset_fname = os.path.join(self.offset_dir, seq_id_prev, 'velodyne_offsets', fn_prev)
+                    offset = np.fromfile(offset_fname, dtype=np.float32).reshape((-1,3))
+                    shifted_pcds = pcds_prev[:, :3] + offset[:, :3]
+        else:
+            shifted_pcds = None
             
         
         # copy-paste augmentation

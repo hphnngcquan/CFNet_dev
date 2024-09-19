@@ -162,11 +162,13 @@ class DataloadTrain(Dataset):
 
     def __getitem__(self, index):
         fname_pcds, fname_labels, seq_id, fn = self.flist[index]
-        mapping_mat = []
+        mapping_mat = {}
         #load point clouds and label file
         pcds = np.fromfile(fname_pcds, dtype=np.float32)
         pcds = pcds.reshape((-1, 4))
-        mapping_mat.append(pcds.shape[0])
+        
+        mapping_mat[int(fn[:-4])] = pcds.shape[0]
+        
         pcds_label = np.fromfile(fname_labels, dtype=np.uint32)
         pcds_label = pcds_label.reshape((-1))
 
@@ -209,6 +211,10 @@ class DataloadTrain(Dataset):
                     
                     # pose transformation of shifted prev pcds
                     shifted_pcds = transform_point_cloud(shifted_pcds, self.pose[seq_id][int(fn_prev[:-4])], self.pose[seq_id][int(fn[:-4])])
+                    assert pcds_prev.shape[0] == shifted_pcds.shape[0]
+                
+                # update mapping matrix
+                mapping_mat[int(fn_prev[:-4])] = pcds_prev.shape[0]
                 
                 # pose transformation of prev pcds 
                 pcds_prev[:, :3] = transform_point_cloud(pcds_prev[:, :3], self.pose[seq_id][int(fn_prev[:-4])], self.pose[seq_id][int(fn[:-4])])

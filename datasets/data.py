@@ -162,11 +162,15 @@ class DataloadTrain(Dataset):
 
     def __getitem__(self, index):
         fname_pcds, fname_labels, seq_id, fn = self.flist[index]
+        
+        # init mapping matrix
         mapping_mat = {}
+        
         #load point clouds and label file
         pcds = np.fromfile(fname_pcds, dtype=np.float32)
         pcds = pcds.reshape((-1, 4))
         
+        # update mapping matrix
         mapping_mat[int(fn[:-4])] = pcds.shape[0]
         
         pcds_label = np.fromfile(fname_labels, dtype=np.uint32)

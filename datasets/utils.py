@@ -263,14 +263,14 @@ def draw_point_with(pcl, indices=None, name='pcl_img.png', s=1, pcl2=None, s2=1)
     embedding_np = pcl  # Convert to numpy array for plotting
     
     # Create a new color array
-    colors = np.full(embedding_np.shape[0], 'w')  # All points are blue
+    colors = np.full(embedding_np.shape[0], 'r')  # All points are blue
     
     # Create a new size array
     sizes = np.full(embedding_np.shape[0], s)  # All points are size 1
     
     if indices is not None:
         indices_np = indices.flatten()  # Flatten the indices array for indexing
-        colors[indices_np] = 'b'  # Centroid points are red
+        colors[indices_np] = 'w'  # Centroid points are red
         sizes[indices_np] = 10  # Centroid points are size 20
 
     # Create a 3D plot

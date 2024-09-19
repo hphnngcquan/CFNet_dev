@@ -96,7 +96,7 @@ class DataloadTrain(Dataset):
 
     def form_batch(self, pcds_total):
         #augment pcds
-        pcds_total = self.aug(pcds_total)
+        # pcds_total = self.aug(pcds_total)
 
         #quantize
         pcds_xyzi = pcds_total[:, :4]
@@ -129,7 +129,7 @@ class DataloadTrain(Dataset):
 
     def form_batch_raw(self, pcds_total):
         #augment pcds
-        pcds_total = self.aug_raw(pcds_total)
+        # pcds_total = self.aug_raw(pcds_total)
 
         #quantize
         pcds_xyzi = pcds_total[:, :4]
@@ -171,7 +171,7 @@ class DataloadTrain(Dataset):
         pcds = pcds.reshape((-1, 4))
         
         # update mapping matrix
-        mapping_mat[int(fn[:-4])] = pcds.shape[0]
+        mapping_mat['n_0'] = pcds.shape[0]
         
         pcds_label = np.fromfile(fname_labels, dtype=np.uint32)
         pcds_label = pcds_label.reshape((-1))
@@ -179,8 +179,8 @@ class DataloadTrain(Dataset):
         sem_label = pcds_label & 0xFFFF
         inst_label = pcds_label >> 16
 
-        pcds_label_use = utils.relabel(sem_label, self.task_cfg['learning_map'])
-        pcds_ins_label = utils.gene_ins_label(pcds_label_use, inst_label)
+        # pcds_label_use = utils.relabel(sem_label, self.task_cfg['learning_map'])
+        # pcds_ins_label = utils.gene_ins_label(pcds_label_use, inst_label)
         
         # prev pcls and shifted
         if self.align and (int(fn[:-4]) > 0):
@@ -217,8 +217,8 @@ class DataloadTrain(Dataset):
                     shifted_pcds = transform_point_cloud(shifted_pcds, self.pose[seq_id][int(fn_prev[:-4])], self.pose[seq_id][int(fn[:-4])])
                     assert pcds_prev.shape[0] == shifted_pcds.shape[0]
                 
-                # update mapping matrix
-                mapping_mat[int(fn_prev[:-4])] = pcds_prev.shape[0]
+                # # update mapping matrix
+                mapping_mat[f'n_{int(fn[:-4]) - int(fn_prev[:-4])}'] = pcds_prev.shape[0]
                 
                 # pose transformation of prev pcds 
                 pcds_prev[:, :3] = transform_point_cloud(pcds_prev[:, :3], self.pose[seq_id][int(fn_prev[:-4])], self.pose[seq_id][int(fn[:-4])])
@@ -229,8 +229,8 @@ class DataloadTrain(Dataset):
                 prev_inst_label = pcds_label_prev >> 16
                 
                 # append labels to lists
-                prev_pcds_label_use_list.append(utils.relabel(prev_sem_label, self.task_cfg['learning_map']))
-                prev_pcds_ins_label_list.append(utils.gene_ins_label(prev_pcds_label_use_list[-1], prev_inst_label))
+                prev_pcds_label_use_list.append(prev_sem_label)
+                prev_pcds_ins_label_list.append(prev_inst_label)
                 prev_pcds_list.append(pcds_prev)
                 
 
@@ -242,9 +242,24 @@ class DataloadTrain(Dataset):
             shifted_pcds = None
             
         
+        final_pcds_label_use = utils.relabel(np.concatenate((sem_label, np.concatenate(prev_pcds_label_use_list)), axis=0), self.task_cfg['learning_map'])
+        final_pcds_ins_label = utils.gene_ins_label(final_pcds_label_use ,np.concatenate((inst_label, np.concatenate(prev_pcds_ins_label_list)), axis=0))
+        prev_pcds_label_use_list = [final_pcds_label_use[mapping_mat['n_0']: mapping_mat['n_2'] + mapping_mat['n_0']], final_pcds_label_use[-mapping_mat['n_1']:]]
+        prev_pcds_ins_label_list = [final_pcds_ins_label[mapping_mat['n_0']: mapping_mat['n_2'] + mapping_mat['n_0']], final_pcds_ins_label[-mapping_mat['n_1']:]]
         # copy-paste augmentation
         if self.cp_aug is not None:
-            pcds, pcds_label_use, pcds_ins_label = self.cp_aug(pcds, pcds_label_use, pcds_ins_label)
+            '''[WARNING] Obsoletted at the moment'''
+            # if shifted_pcds is not None:
+            #     prev_pcds_list = np.concatenate(prev_pcds_list, axis=0)
+            #     prev_pcds_label_use_list = np.concatenate(prev_pcds_label_use_list, axis=0)
+            #     prev_pcds_ins_label_list = np.concatenate(prev_pcds_ins_label_list, axis=0)
+            #     pcds, pcds_label_use, pcds_ins_label,\
+            #         prev_pcds_list, prev_pcds_label_use_list, prev_pcds_ins_label_list, shifted_pcds, mapping_mat\
+            #             = self.cp_aug(pcds, pcds_label_use, pcds_ins_label, \
+            #                 prev_pcds_list, prev_pcds_label_use_list, prev_pcds_ins_label_list, shifted_pcds, mapping_mat)
+            # else:
+
+            pcds, pcds_label_use, pcds_ins_label = self.cp_aug(pcds, final_pcds_label_use[:mapping_mat['n_0']], final_pcds_ins_label[:mapping_mat['n_0']])
         
         # merge pcds and labels
         pcds_total = np.concatenate((pcds, pcds_label_use[:, np.newaxis], pcds_ins_label[:, np.newaxis]), axis=1)
@@ -252,10 +267,28 @@ class DataloadTrain(Dataset):
         # resample
         choice = np.random.choice(pcds_total.shape[0], self.frame_point_num, replace=True)
         pcds_total = pcds_total[choice]
-
+        
+        mapping_mat['n_0'] = pcds_total.shape[0]
+        
+        prev_pcds_total = []
+        for i, _ in enumerate(prev_pcds_list):
+            prev_pcds_total_n = np.concatenate((prev_pcds_list[i], prev_pcds_label_use_list[i][:, np.newaxis], prev_pcds_ins_label_list[i][:, np.newaxis]), axis=1)
+            choice = np.random.choice(prev_pcds_total_n.shape[0], self.frame_point_num, replace=True)
+            if prev_pcds_total_n.shape[0] == shifted_pcds.shape[0]:
+                shifted_pcds = shifted_pcds[choice]
+                mapping_mat['n_1'] = shifted_pcds.shape[0]
+            prev_pcds_total.append(prev_pcds_total_n[choice])
+        
+        shifted_pcds = np.concatenate((shifted_pcds, np.zeros((shifted_pcds.shape[0], (pcds_total.shape[-1] - shifted_pcds.shape[-1])))), axis=1)   
+        pcds_for_aug = np.concatenate((pcds_total.copy(), np.concatenate(prev_pcds_total.copy()), shifted_pcds), axis=0)
+        
+        pcds_for_aug = self.aug(pcds_for_aug.copy())
+        pcds_for_aug_raw = self.aug_raw(pcds_for_aug.copy())
+        shifted_pcds = pcds_for_aug[-mapping_mat['n_1']:][:, :3]
+        shifted_pcds_raw = pcds_for_aug_raw[-mapping_mat['n_1']:][:, :3]
         # preprocess
-        pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset = self.form_batch(pcds_total.copy())
-        pcds_xyzi_raw, pcds_coord_raw, pcds_sphere_coord_raw, pcds_sem_label_raw, pcds_ins_label_raw, pcds_offset_raw = self.form_batch_raw(pcds_total.copy())
+        pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset = self.form_batch(pcds_for_aug[:-mapping_mat['n_1']])
+        pcds_xyzi_raw, pcds_coord_raw, pcds_sphere_coord_raw, pcds_sem_label_raw, pcds_ins_label_raw, pcds_offset_raw = self.form_batch_raw(pcds_for_aug_raw[:-mapping_mat['n_1']])
         return pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset,\
             pcds_xyzi_raw, pcds_coord_raw, pcds_sphere_coord_raw, pcds_sem_label_raw, pcds_ins_label_raw, pcds_offset_raw, seq_id, fn
 

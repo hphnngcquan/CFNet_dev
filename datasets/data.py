@@ -178,31 +178,57 @@ class DataloadTrain(Dataset):
         
         # prev pcls and shifted
         if self.align and (int(fn[:-4]) > 0):
+            
+            # get index of prev scans
             scan_idx = index
             from_idx = scan_idx - self.n_past_pcls
+            
+            # init lists
             prev_pcds_list = []
             prev_pcds_label_use_list = []
             prev_pcds_ins_label_list = []
+            
+            # enumerate prev scans
             for i, list in enumerate(self.flist[from_idx : scan_idx]):
                 fname_pcds_prev, fname_labels_prev, seq_id_prev, fn_prev = list
+                
+                #  continue if not the same sequence
                 if seq_id_prev != seq_id:
                     continue
                 
+                # read prev pcds
                 pcds_prev = np.fromfile(fname_pcds_prev, dtype=np.float32).reshape((-1,4))
+                
+                # parse shifted prev pcds if fn_prev + 1 = fn
+                if (int(fn_prev[:-4]) + 1) == int(fn[:-4]):
+                    offset_fname = os.path.join(self.offset_dir, seq_id_prev, 'velodyne_offsets', fn_prev)
+                    offset = np.fromfile(offset_fname, dtype=np.float32).reshape((-1,3))
+                    
+                    # output shifted prev pcds
+                    shifted_pcds = pcds_prev[:, :3] + offset[:, :3]
+                    
+                    # pose transformation of shifted prev pcds
+                    shifted_pcds = transform_point_cloud(shifted_pcds, self.pose[seq_id][int(fn_prev[:-4])], self.pose[seq_id][int(fn[:-4])])
+                
+                # pose transformation of prev pcds 
+                pcds_prev[:, :3] = transform_point_cloud(pcds_prev[:, :3], self.pose[seq_id][int(fn_prev[:-4])], self.pose[seq_id][int(fn[:-4])])
+                
+                # read prev labels
                 pcds_label_prev = np.fromfile(fname_labels_prev, dtype=np.uint32).reshape((-1))
                 prev_sem_label = pcds_label_prev & 0xFFFF
                 prev_inst_label = pcds_label_prev >> 16
                 
+                # append labels to lists
                 prev_pcds_label_use_list.append(utils.relabel(prev_sem_label, self.task_cfg['learning_map']))
                 prev_pcds_ins_label_list.append(utils.gene_ins_label(prev_pcds_label_use_list[-1], prev_inst_label))
-                
                 prev_pcds_list.append(pcds_prev)
                 
-                if (int(fn_prev[:-4]) + 1) == int(fn[:-4]):
-                    offset_fname = os.path.join(self.offset_dir, seq_id_prev, 'velodyne_offsets', fn_prev)
-                    offset = np.fromfile(offset_fname, dtype=np.float32).reshape((-1,3))
-                    shifted_pcds = pcds_prev[:, :3] + offset[:, :3]
+
         else:
+            # if fn is 0 or align is not used
+            prev_pcds_list = None
+            prev_pcds_label_use_list = None
+            prev_pcds_ins_label_list = None
             shifted_pcds = None
             
         

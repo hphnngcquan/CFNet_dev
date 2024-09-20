@@ -248,17 +248,6 @@ class DataloadTrain(Dataset):
         prev_pcds_ins_label_list = [final_pcds_ins_label[mapping_mat['n_0']: mapping_mat['n_2'] + mapping_mat['n_0']], final_pcds_ins_label[-mapping_mat['n_1']:]]
         # copy-paste augmentation
         if self.cp_aug is not None:
-            '''[WARNING] Obsoletted at the moment'''
-            # if shifted_pcds is not None:
-            #     prev_pcds_list = np.concatenate(prev_pcds_list, axis=0)
-            #     prev_pcds_label_use_list = np.concatenate(prev_pcds_label_use_list, axis=0)
-            #     prev_pcds_ins_label_list = np.concatenate(prev_pcds_ins_label_list, axis=0)
-            #     pcds, pcds_label_use, pcds_ins_label,\
-            #         prev_pcds_list, prev_pcds_label_use_list, prev_pcds_ins_label_list, shifted_pcds, mapping_mat\
-            #             = self.cp_aug(pcds, pcds_label_use, pcds_ins_label, \
-            #                 prev_pcds_list, prev_pcds_label_use_list, prev_pcds_ins_label_list, shifted_pcds, mapping_mat)
-            # else:
-
             pcds, pcds_label_use, pcds_ins_label = self.cp_aug(pcds, final_pcds_label_use[:mapping_mat['n_0']], final_pcds_ins_label[:mapping_mat['n_0']])
         
         # merge pcds and labels
@@ -289,8 +278,8 @@ class DataloadTrain(Dataset):
         # preprocess
         pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset = self.form_batch(pcds_for_aug[:-mapping_mat['n_1']])
         pcds_xyzi_raw, pcds_coord_raw, pcds_sphere_coord_raw, pcds_sem_label_raw, pcds_ins_label_raw, pcds_offset_raw = self.form_batch_raw(pcds_for_aug_raw[:-mapping_mat['n_1']])
-        return pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset,\
-            pcds_xyzi_raw, pcds_coord_raw, pcds_sphere_coord_raw, pcds_sem_label_raw, pcds_ins_label_raw, pcds_offset_raw, seq_id, fn
+        return pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset, shifted_pcds,\
+            pcds_xyzi_raw, pcds_coord_raw, pcds_sphere_coord_raw, pcds_sem_label_raw, pcds_ins_label_raw, pcds_offset_raw, shifted_pcds_raw, mapping_mat, seq_id, fn
 
     def __len__(self):
         return len(self.flist)

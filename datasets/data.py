@@ -192,8 +192,8 @@ class DataloadTrain(Dataset):
             prev_pcds_ins_label_list = []
             
             # enumerate prev scans
-            for i, list in enumerate(self.flist[from_idx : scan_idx]):
-                fname_pcds_prev, fname_labels_prev, seq_id_prev, fn_prev = list
+            for i, data_list in enumerate(self.flist[from_idx : scan_idx]):
+                fname_pcds_prev, fname_labels_prev, seq_id_prev, fn_prev = data_list
                 
                 #  continue if not the same sequence
                 if seq_id_prev != seq_id:

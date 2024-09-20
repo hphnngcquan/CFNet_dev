@@ -178,9 +178,6 @@ class DataloadTrain(Dataset):
 
         sem_label = pcds_label & 0xFFFF
         inst_label = pcds_label >> 16
-
-        # pcds_label_use = utils.relabel(sem_label, self.task_cfg['learning_map'])
-        # pcds_ins_label = utils.gene_ins_label(pcds_label_use, inst_label)
         
         # prev pcls and shifted
         if self.align and (int(fn[:-4]) > 0):

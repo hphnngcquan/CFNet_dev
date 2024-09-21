@@ -281,11 +281,10 @@ class DataloadTrain(Dataset):
         prev_pcds_total = []
         for i, _ in enumerate(prev_pcds_list):
             prev_pcds_total_n = np.concatenate((prev_pcds_list[i], prev_pcds_label_use_list[i][:, np.newaxis], prev_pcds_ins_label_list[i][:, np.newaxis]), axis=1)
-            choice = np.random.choice(prev_pcds_total_n.shape[0], self.frame_point_num, replace=True)
-            if prev_pcds_total_n.shape[0] == shifted_pcds.shape[0]:
-                shifted_pcds = shifted_pcds[choice]
-                mapping_mat['n_1'] = shifted_pcds.shape[0]
-            prev_pcds_total.append(prev_pcds_total_n[choice])
+            if prev_pcds_total_n.shape[0] == (mapping_mat['n_2'] - mapping_mat['n_1']):
+                choice = np.random.choice(prev_pcds_total_n.shape[0], self.frame_point_num * (self.n_past_pcls - 1), replace=True)
+                prev_pcds_total_n = prev_pcds_total_n[choice]
+            prev_pcds_total.append(prev_pcds_total_n)
         
         shifted_pcds = np.concatenate((shifted_pcds, np.zeros((shifted_pcds.shape[0], (pcds_total.shape[-1] - shifted_pcds.shape[-1])))), axis=1)   
         pcds_for_aug = np.concatenate((pcds_total.copy(), np.concatenate(prev_pcds_total.copy()), shifted_pcds), axis=0)
@@ -486,7 +485,7 @@ class DataloadVal(Dataset):
         for i, _ in enumerate(prev_pcds_list):
             prev_pcds_total_n = np.concatenate((prev_pcds_list[i], prev_pcds_label_use_list[i][:, np.newaxis], prev_pcds_ins_label_list[i][:, np.newaxis]), axis=1)
             if prev_pcds_total_n.shape[0] == (mapping_mat['n_2'] - mapping_mat['n_1']):
-                choice = np.random.choice(prev_pcds_total_n.shape[0], self.frame_point_num, replace=True)
+                choice = np.random.choice(prev_pcds_total_n.shape[0], self.frame_point_num * (self.n_past_pcls - 1), replace=True)
                 prev_pcds_total_n = prev_pcds_total_n[choice]
             prev_pcds_total.append(prev_pcds_total_n)
         
@@ -676,7 +675,7 @@ class DataloadTest(Dataset):
         for i, _ in enumerate(prev_pcds_list):
             prev_pcds_total_n = prev_pcds_list[i]
             if prev_pcds_total_n.shape[0] == (mapping_mat['n_2'] - mapping_mat['n_1']):
-                choice = np.random.choice(prev_pcds_total_n.shape[0], self.frame_point_num, replace=True)
+                choice = np.random.choice(prev_pcds_total_n.shape[0], self.frame_point_num * (self.n_past_pcls - 1), replace=True)
                 prev_pcds_total_n = prev_pcds_total_n[choice]
             prev_pcds_total.append(prev_pcds_total_n)
         

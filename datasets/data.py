@@ -399,7 +399,7 @@ class DataloadVal(Dataset):
             
             # get index of prev scans
             scan_idx = index
-            from_idx = scan_idx - 1
+            from_idx = scan_idx - self.n_past_pcls
             
             # init lists
             prev_pcds_list = []
@@ -531,7 +531,7 @@ class DataloadVal(Dataset):
         pcds_offset = torch.stack(pcds_offset_list, dim=0)
         shifted_pcds = torch.stack(shifted_pcds_list, dim=0)
         pano_label = torch.LongTensor(pano_label.astype(np.int64))
-        return pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset, pano_label, seq_id, fn
+        return pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset, pano_label, shifted_pcds, mapping_mat, seq_id, fn
     
     def __len__(self):
         return len(self.flist)
@@ -711,7 +711,7 @@ class DataloadTest(Dataset):
         pcds_coord = torch.stack(pcds_coord_list, dim=0)
         pcds_sphere_coord = torch.stack(pcds_sphere_coord_list, dim=0)
         shifted_pcds = torch.stack(shifted_pcds_list, dim=0)
-        return pcds_xyzi, pcds_coord, pcds_sphere_coord, seq_id, fn
+        return pcds_xyzi, pcds_coord, pcds_sphere_coord, shifted_pcds, mapping_mat, seq_id, fn
     
     def __len__(self):
         return len(self.flist)

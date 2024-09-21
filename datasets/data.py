@@ -172,6 +172,7 @@ class DataloadTrain(Dataset):
         
         # update mapping matrix
         mapping_mat['n_0'] = pcds.shape[0]
+        mapping_mat['n_2'] = 0
         
         pcds_label = np.fromfile(fname_labels, dtype=np.uint32)
         pcds_label = pcds_label.reshape((-1))
@@ -184,7 +185,7 @@ class DataloadTrain(Dataset):
             
             # get index of prev scans
             scan_idx = index
-            from_idx = scan_idx - self.n_past_pcls
+            from_idx = scan_idx - self.n_past_pcls  #TODO Changed here
             
             # init lists
             prev_pcds_list = []
@@ -210,12 +211,16 @@ class DataloadTrain(Dataset):
                     # output shifted prev pcds
                     shifted_pcds = pcds_prev[:, :3] + offset[:, :3]
                     
+                    # mapping mat
+                    mapping_mat['n_1'] = pcds_prev.shape[0]
+                    
                     # pose transformation of shifted prev pcds
                     shifted_pcds = transform_point_cloud(shifted_pcds, self.pose[seq_id][int(fn_prev[:-4])], self.pose[seq_id][int(fn[:-4])])
                     assert pcds_prev.shape[0] == shifted_pcds.shape[0]
                 
                 # # update mapping matrix
-                mapping_mat[f'n_{int(fn[:-4]) - int(fn_prev[:-4])}'] = pcds_prev.shape[0]
+                # mapping_mat[f'n_{int(fn[:-4]) - int(fn_prev[:-4])}'] = pcds_prev.shape[0]
+                mapping_mat['n_2'] += pcds_prev.shape[0]
                 
                 # pose transformation of prev pcds 
                 pcds_prev[:, :3] = transform_point_cloud(pcds_prev[:, :3], self.pose[seq_id][int(fn_prev[:-4])], self.pose[seq_id][int(fn[:-4])])
@@ -233,16 +238,33 @@ class DataloadTrain(Dataset):
 
         else:
             # if fn is 0 or align is not used
-            prev_pcds_list = None
-            prev_pcds_label_use_list = None
-            prev_pcds_ins_label_list = None
-            shifted_pcds = None
+            prev_pcds_list = [pcds]
+            prev_pcds_label_use_list = [sem_label]
+            prev_pcds_ins_label_list = [inst_label]
+            shifted_pcds = pcds
+            
+            mapping_mat['n_1'] = pcds.shape[0]
+            mapping_mat['n_2'] = pcds.shape[0]
             
         
         final_pcds_label_use = utils.relabel(np.concatenate((sem_label, np.concatenate(prev_pcds_label_use_list)), axis=0), self.task_cfg['learning_map'])
         final_pcds_ins_label = utils.gene_ins_label(final_pcds_label_use ,np.concatenate((inst_label, np.concatenate(prev_pcds_ins_label_list)), axis=0))
-        prev_pcds_label_use_list = [final_pcds_label_use[mapping_mat['n_0']: mapping_mat['n_2'] + mapping_mat['n_0']], final_pcds_label_use[-mapping_mat['n_1']:]]
-        prev_pcds_ins_label_list = [final_pcds_ins_label[mapping_mat['n_0']: mapping_mat['n_2'] + mapping_mat['n_0']], final_pcds_ins_label[-mapping_mat['n_1']:]]
+
+        
+        # when fn > 1
+        if mapping_mat['n_2'] > mapping_mat['n_1']:
+            prev_pcds_label_use_list = [final_pcds_label_use[mapping_mat['n_0']: -mapping_mat['n_1']], final_pcds_label_use[-mapping_mat['n_1']:]]
+            prev_pcds_ins_label_list = [final_pcds_ins_label[mapping_mat['n_0']: -mapping_mat['n_1']], final_pcds_ins_label[-mapping_mat['n_1']:]]
+            prev_pcds_list = [np.concatenate(prev_pcds_list)[: -mapping_mat['n_1']], np.concatenate(prev_pcds_list)[-mapping_mat['n_1']:]]
+        
+        #  when fn = 1
+        elif mapping_mat['n_2'] == mapping_mat['n_1']:
+            prev_pcds_label_use_list = [final_pcds_label_use[mapping_mat['n_0']:]]
+            prev_pcds_ins_label_list = [final_pcds_ins_label[mapping_mat['n_0']:]]
+            assert len(prev_pcds_list) == 1
+            assert prev_pcds_list[0].shape[0] == mapping_mat['n_1']
+            
+        
         # copy-paste augmentation
         if self.cp_aug is not None:
             pcds, pcds_label_use, pcds_ins_label = self.cp_aug(pcds, final_pcds_label_use[:mapping_mat['n_0']], final_pcds_ins_label[:mapping_mat['n_0']])
@@ -270,11 +292,19 @@ class DataloadTrain(Dataset):
         
         pcds_for_aug = self.aug(pcds_for_aug.copy())
         pcds_for_aug_raw = self.aug_raw(pcds_for_aug.copy())
-        shifted_pcds = pcds_for_aug[-mapping_mat['n_1']:][:, :3]
-        shifted_pcds_raw = pcds_for_aug_raw[-mapping_mat['n_1']:][:, :3]
+        shifted_pcds = torch.FloatTensor(pcds_for_aug[-mapping_mat['n_1']:][:, :3].astype(np.float32)).transpose(1, 0).contiguous().unsqueeze(-1)
+        shifted_pcds_raw = torch.FloatTensor(pcds_for_aug_raw[-mapping_mat['n_1']:][:, :3].astype(np.float32)).transpose(1, 0).contiguous().unsqueeze(-1)
+        
         # preprocess
-        pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset = self.form_batch(pcds_for_aug[:-mapping_mat['n_1']])
-        pcds_xyzi_raw, pcds_coord_raw, pcds_sphere_coord_raw, pcds_sem_label_raw, pcds_ins_label_raw, pcds_offset_raw = self.form_batch_raw(pcds_for_aug_raw[:-mapping_mat['n_1']])
+        if self.align and (int(fn[:-4]) > 0):
+            pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset = self.form_batch(pcds_for_aug[:-mapping_mat['n_1']])
+            pcds_xyzi_raw, pcds_coord_raw, pcds_sphere_coord_raw, pcds_sem_label_raw, pcds_ins_label_raw, pcds_offset_raw = self.form_batch_raw(pcds_for_aug_raw[:-mapping_mat['n_1']])
+        else:
+            pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset = self.form_batch(pcds_for_aug[:mapping_mat['n_0']])
+            pcds_xyzi_raw, pcds_coord_raw, pcds_sphere_coord_raw, pcds_sem_label_raw, pcds_ins_label_raw, pcds_offset_raw = self.form_batch_raw(pcds_for_aug_raw[:mapping_mat['n_0']])
+        
+        
+
         return pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset, shifted_pcds,\
             pcds_xyzi_raw, pcds_coord_raw, pcds_sphere_coord_raw, pcds_sem_label_raw, pcds_ins_label_raw, pcds_offset_raw, shifted_pcds_raw, mapping_mat, seq_id, fn
 
@@ -288,6 +318,11 @@ class DataloadVal(Dataset):
         self.flist = []
         self.config = config
         self.frame_point_num = config.frame_point_num
+        self.align = config.align_used
+        self.offset_dir = config.OffsetDir
+        if self.align:
+            self.pose = {}
+            self.n_past_pcls = config.n_past_pcls
         self.Voxel = config.Voxel
         with open('datasets/semantic-kitti.yaml', 'r') as f:
             self.task_cfg = yaml.safe_load(f)
@@ -302,6 +337,11 @@ class DataloadVal(Dataset):
                 fname_pcds = os.path.join(fpath_pcds, f"{str(fn_id).rjust(6, '0')}.bin")
                 fname_labels = os.path.join(fpath_labels, f"{str(fn_id).rjust(6, '0')}.label")
                 self.flist.append((fname_pcds, fname_labels, seq_id, f"{str(fn_id).rjust(6, '0')}.bin"))
+            
+            # read poses
+            if self.align:
+                self.pose[seq_id] = read_poses(fpath)
+                assert len(self.pose[seq_id]) == file_list_length
         
         print('Validation Samples: ', len(self.flist))
     
@@ -337,10 +377,16 @@ class DataloadVal(Dataset):
     
     def __getitem__(self, index):
         fname_pcds, fname_labels, seq_id, fn = self.flist[index]
+        
+        # init mapping matrix
+        mapping_mat = {}
 
         #load point clouds and label file
         pcds = np.fromfile(fname_pcds, dtype=np.float32)
         pcds = pcds.reshape((-1, 4))
+        
+        # update mapping matrix
+        mapping_mat['n_0'] = pcds.shape[0]
 
         pcds_label = np.fromfile(fname_labels, dtype=np.uint32)
         pcds_label = pcds_label.reshape((-1))
@@ -348,13 +394,81 @@ class DataloadVal(Dataset):
         sem_label = pcds_label & 0xFFFF
         inst_label = pcds_label >> 16
 
-        pcds_label_use = utils.relabel(sem_label, self.task_cfg['learning_map'])
-        pcds_ins_label = utils.gene_ins_label(pcds_label_use, inst_label)
+        if self.align and (int(fn[:-4]) > 0):
+            
+            # get index of prev scans
+            scan_idx = index
+            from_idx = scan_idx - self.n_past_pcls
+            
+            # init lists
+            prev_pcds_list = []
+            prev_pcds_label_use_list = []
+            prev_pcds_ins_label_list = []
+            
+            # enumerate prev scans
+            for i, data_list in enumerate(self.flist[from_idx : scan_idx]):
+                fname_pcds_prev, fname_labels_prev, seq_id_prev, fn_prev = data_list
+                
+                #  continue if not the same sequence
+                if seq_id_prev != seq_id:
+                    continue
+                
+                # read prev pcds
+                pcds_prev = np.fromfile(fname_pcds_prev, dtype=np.float32).reshape((-1,4))
+                
+                # parse shifted prev pcds if fn_prev + 1 = fn
+                if (int(fn_prev[:-4]) + 1) == int(fn[:-4]):
+                    offset_fname = os.path.join(self.offset_dir, seq_id_prev, 'velodyne_offsets', fn_prev)
+                    offset = np.fromfile(offset_fname, dtype=np.float32).reshape((-1,3))
+                    
+                    # output shifted prev pcds
+                    shifted_pcds = pcds_prev[:, :3] + offset[:, :3]
+                    
+                    # pose transformation of shifted prev pcds
+                    shifted_pcds = transform_point_cloud(shifted_pcds, self.pose[seq_id][int(fn_prev[:-4])], self.pose[seq_id][int(fn[:-4])])
+                    assert pcds_prev.shape[0] == shifted_pcds.shape[0]
+                    
+                # # update mapping matrix
+                mapping_mat[f'n_{int(fn[:-4]) - int(fn_prev[:-4])}'] = pcds_prev.shape[0]
+                
+                # pose transformation of prev pcds
+                pcds_prev[:, :3] = transform_point_cloud(pcds_prev[:, :3], self.pose[seq_id][int(fn_prev[:-4])], self.pose[seq_id][int(fn[:-4])])
+                
+                # read prev labels
+                pcds_label_prev = np.fromfile(fname_labels_prev, dtype=np.uint32).reshape((-1))
+                prev_sem_label = pcds_label_prev & 0xFFFF
+                prev_inst_label = pcds_label_prev >> 16
+                
+                # append labels to lists
+                prev_pcds_label_use_list.append(prev_sem_label)
+                prev_pcds_ins_label_list.append(prev_inst_label)
+                prev_pcds_list.append(pcds_prev)
+                
+        else:
+            # if fn is 0 or align is not used
+            prev_pcds_list = None
+            prev_pcds_label_use_list = None
+            prev_pcds_ins_label_list = None
+            shifted_pcds = None
         
-        pano_label = (inst_label << 16) + pcds_label_use
+        final_pcds_label_use = utils.relabel(np.concatenate((sem_label, np.concatenate(prev_pcds_label_use_list)), axis=0), self.task_cfg['learning_map'])
+        final_pcds_ins_label = utils.gene_ins_label(final_pcds_label_use ,np.concatenate((inst_label, np.concatenate(prev_pcds_ins_label_list)), axis=0))
+        prev_pcds_label_use_list = [final_pcds_label_use[mapping_mat['n_0']: mapping_mat['n_2'] + mapping_mat['n_0']], final_pcds_label_use[-mapping_mat['n_1']:]]
+        prev_pcds_ins_label_list = [final_pcds_ins_label[mapping_mat['n_0']: mapping_mat['n_2'] + mapping_mat['n_0']], final_pcds_ins_label[-mapping_mat['n_1']:]]
+                    
+                    
         # merge pcds and labels
-        pcds_total = np.concatenate((pcds, pcds_label_use[:, np.newaxis], pcds_ins_label[:, np.newaxis]), axis=1)
-
+        pcds_total = np.concatenate((pcds, final_pcds_label_use[:mapping_mat['n_0']][:, np.newaxis], final_pcds_ins_label[:mapping_mat['n_0']][:, np.newaxis]), axis=1)
+        pano_label = (final_pcds_ins_label << 16) + final_pcds_label_use
+        # prev pcds total
+        prev_pcds_total = []
+        for i, _ in enumerate(prev_pcds_list):
+            prev_pcds_total_n = np.concatenate((prev_pcds_list[i], prev_pcds_label_use_list[i][:, np.newaxis], prev_pcds_ins_label_list[i][:, np.newaxis]), axis=1)
+            prev_pcds_total.append(prev_pcds_total_n)
+        
+        shifted_pcds = np.concatenate((shifted_pcds, np.zeros((shifted_pcds.shape[0], (pcds_total.shape[-1] - shifted_pcds.shape[-1])))), axis=1)
+        pcds_for_aug = np.concatenate((pcds_total.copy(), np.concatenate(prev_pcds_total.copy()), shifted_pcds), axis=0)
+        
         # data aug
         pcds_xyzi_list = []
         pcds_coord_list = []
@@ -362,12 +476,16 @@ class DataloadVal(Dataset):
         pcds_sem_label_list = []
         pcds_ins_label_list = []
         pcds_offset_list = []
+        shifted_pcds_list = []
         for x_sign in [1, -1]:
             for y_sign in [1, -1]:
-                pcds_tmp = pcds_total.copy()
+                pcds_tmp = pcds_for_aug.copy()
                 pcds_tmp[:, 0] *= x_sign
                 pcds_tmp[:, 1] *= y_sign
-                pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset = self.form_batch(pcds_tmp)
+                
+                # shifted
+                shifted_pcds = torch.FloatTensor(pcds_tmp[-mapping_mat['n_1']:][:, :3].astype(np.float32)).transpose(1, 0).contiguous().unsqueeze(-1)
+                pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset = self.form_batch(pcds_tmp[:-mapping_mat['n_1']])
 
                 pcds_xyzi_list.append(pcds_xyzi)
                 pcds_coord_list.append(pcds_coord)
@@ -375,6 +493,7 @@ class DataloadVal(Dataset):
                 pcds_sem_label_list.append(pcds_sem_label)
                 pcds_ins_label_list.append(pcds_ins_label)
                 pcds_offset_list.append(pcds_offset)
+                shifted_pcds_list.append(shifted_pcds)
         
         pcds_xyzi = torch.stack(pcds_xyzi_list, dim=0)
         pcds_coord = torch.stack(pcds_coord_list, dim=0)
@@ -382,6 +501,7 @@ class DataloadVal(Dataset):
         pcds_sem_label = torch.stack(pcds_sem_label_list, dim=0)
         pcds_ins_label = torch.stack(pcds_ins_label_list, dim=0)
         pcds_offset = torch.stack(pcds_offset_list, dim=0)
+        shifted_pcds = torch.stack(shifted_pcds_list, dim=0)
         pano_label = torch.LongTensor(pano_label.astype(np.int64))
         return pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset, pano_label, seq_id, fn
     

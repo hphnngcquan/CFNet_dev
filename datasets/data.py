@@ -174,9 +174,11 @@ class DataloadTrain(Dataset):
         mapping_mat['n_0'] = pcds.shape[0]
         mapping_mat['n_2'] = 0
         
+        # read n_0 label
         pcds_label = np.fromfile(fname_labels, dtype=np.uint32)
         pcds_label = pcds_label.reshape((-1))
 
+        # process labels
         sem_label = pcds_label & 0xFFFF
         inst_label = pcds_label >> 16
         
@@ -185,8 +187,10 @@ class DataloadTrain(Dataset):
             
             # get index of prev scans
             scan_idx = index
-            from_idx = scan_idx - self.n_past_pcls  #TODO Changed here
-            
+            # from_idx = scan_idx - self.n_past_pcls  #TODO Changed here
+            from_idx = max(0, index - self.n_past_pcls)
+
+                
             # init lists
             prev_pcds_list = []
             prev_pcds_label_use_list = []
@@ -194,6 +198,8 @@ class DataloadTrain(Dataset):
             
             # enumerate prev scans
             for i, data_list in enumerate(self.flist[from_idx : scan_idx]):
+                
+                # read from previous index
                 fname_pcds_prev, fname_labels_prev, seq_id_prev, fn_prev = data_list
                 
                 #  continue if not the same sequence
@@ -257,7 +263,7 @@ class DataloadTrain(Dataset):
             prev_pcds_ins_label_list = [final_pcds_ins_label[mapping_mat['n_0']: -mapping_mat['n_1']], final_pcds_ins_label[-mapping_mat['n_1']:]]
             prev_pcds_list = [np.concatenate(prev_pcds_list)[: -mapping_mat['n_1']], np.concatenate(prev_pcds_list)[-mapping_mat['n_1']:]]
         
-        #  when fn = 1
+        #  when fn = 1 or fn = 0
         elif mapping_mat['n_2'] == mapping_mat['n_1']:
             prev_pcds_label_use_list = [final_pcds_label_use[mapping_mat['n_0']:]]
             prev_pcds_ins_label_list = [final_pcds_ins_label[mapping_mat['n_0']:]]
@@ -301,6 +307,10 @@ class DataloadTrain(Dataset):
         else:
             pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset = self.form_batch(pcds_for_aug[:mapping_mat['n_0']])
             pcds_xyzi_raw, pcds_coord_raw, pcds_sphere_coord_raw, pcds_sem_label_raw, pcds_ins_label_raw, pcds_offset_raw = self.form_batch_raw(pcds_for_aug_raw[:mapping_mat['n_0']])
+            
+            # because fn is 0, there is not prev shifted pcds
+            shifted_pcds = None
+            shifted_pcds_raw = None
         
         
 
@@ -398,7 +408,7 @@ class DataloadVal(Dataset):
             
             # get index of prev scans
             scan_idx = index
-            from_idx = scan_idx - self.n_past_pcls
+            from_idx = max(0, scan_idx - self.n_past_pcls)
             
             # init lists
             prev_pcds_list = []
@@ -467,6 +477,7 @@ class DataloadVal(Dataset):
             prev_pcds_ins_label_list = [final_pcds_ins_label[mapping_mat['n_0']: -mapping_mat['n_1']], final_pcds_ins_label[-mapping_mat['n_1']:]]
             prev_pcds_list = [np.concatenate(prev_pcds_list)[: -mapping_mat['n_1']], np.concatenate(prev_pcds_list)[-mapping_mat['n_1']:]]
         
+        # when fn = 1 or fn = 0
         elif mapping_mat['n_2'] == mapping_mat['n_1']:
             prev_pcds_label_use_list = [final_pcds_label_use[mapping_mat['n_0']:]]
             prev_pcds_ins_label_list = [final_pcds_ins_label[mapping_mat['n_0']:]]
@@ -513,6 +524,7 @@ class DataloadVal(Dataset):
                     pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset = self.form_batch(pcds_tmp[:-mapping_mat['n_1']])
                 else:
                     pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset = self.form_batch(pcds_tmp[:mapping_mat['n_0']])
+                    shifted_pcds = None
 
                 pcds_xyzi_list.append(pcds_xyzi)
                 pcds_coord_list.append(pcds_coord)
@@ -611,7 +623,7 @@ class DataloadTest(Dataset):
             
             # get index of prev scans
             scan_idx = index
-            from_idx = scan_idx - self.n_past_pcls
+            from_idx = max(0, scan_idx - self.n_past_pcls)
             
             # init lists
             prev_pcds_list = []
@@ -664,6 +676,7 @@ class DataloadTest(Dataset):
         if mapping_mat['n_2'] > mapping_mat['n_1']:
             prev_pcds_list = [np.concatenate(prev_pcds_list)[: -mapping_mat['n_1']], np.concatenate(prev_pcds_list)[-mapping_mat['n_1']:]]
         
+        # when fn = 1 or fn = 0 
         elif mapping_mat['n_2'] == mapping_mat['n_1']:
             assert len(prev_pcds_list) == 1
             assert prev_pcds_list[0].shape[0] == mapping_mat['n_1']
@@ -700,6 +713,7 @@ class DataloadTest(Dataset):
                     pcds_xyzi, pcds_coord, pcds_sphere_coord = self.form_batch(pcds_tmp[:-mapping_mat['n_1']])
                 else:
                     pcds_xyzi, pcds_coord, pcds_sphere_coord = self.form_batch(pcds_tmp[:mapping_mat['n_0']])
+                    shifted_pcds = None
 
                 pcds_xyzi_list.append(pcds_xyzi)
                 pcds_coord_list.append(pcds_coord)

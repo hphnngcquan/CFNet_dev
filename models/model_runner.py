@@ -145,19 +145,23 @@ class ModelRunnerSemKITTI(trainer.ADDistTrainer):
     
     @torch.no_grad()
     def validation_step(self, batch_idx, batch):
-        pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset, pano_label, seq_id, fn = batch
+        pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset, pano_label, shifted_pcds, mapping_mat, seq_id, fn = batch
 
         pano_label = pano_label.cpu().numpy().astype(np.uint32)[0]
-        pred_list = self.model(pcds_xyzi.squeeze(0), pcds_coord.squeeze(0), pcds_sphere_coord.squeeze(0))
+        pred_list = self.model(pcds_xyzi.squeeze(0), pcds_coord.squeeze(0), pcds_sphere_coord.squeeze(0),
+                               shifted_pcds=shifted_pcds.squeeze(0), mapping_mat=mapping_mat)
 
         pred_panoptic_list = []
         for (pred_sem, pred_offset, pred_hmap) in pred_list:
+            pred_sem = pred_sem[:, :, :mapping_mat['n_0'][0]]
+            pred_offset = pred_offset[:, :mapping_mat['n_0'][0]]
+            pred_hmap = pred_hmap[:, :mapping_mat['n_0'][0]]
             pred_sem = F.softmax(pred_sem, dim=1).mean(dim=0).permute(2, 1, 0).contiguous()[0]
             pred_offset = merge_offset_tta(pred_offset)
             pred_hmap = pred_hmap.mean(dim=0).squeeze(1)
 
             # make result
-            pred_obj_center, pred_panoptic = self.pv_nms(pcds_xyzi[0, 0, :3, :, 0].T.contiguous(), pred_sem, pred_offset, pred_hmap)
+            pred_obj_center, pred_panoptic = self.pv_nms(pcds_xyzi[0, 0, :3, :mapping_mat['n_0'][0], 0].T.contiguous(), pred_sem, pred_offset, pred_hmap)
             pred_panoptic = pred_panoptic.cpu().numpy().astype(np.uint32)
 
             pred_panoptic_list.append(pred_panoptic)
@@ -211,18 +215,22 @@ class ModelRunnerSemKITTI(trainer.ADDistTrainer):
     
     @torch.no_grad()
     def test_step(self, batch_idx, batch):
-        pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset, pano_label, seq_id, fn = batch
+        pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset, pano_label, shifted_pcds, mapping_mat, seq_id, fn = batch
 
         pano_label = pano_label.cpu().numpy().astype(np.uint32)[0]
-        pred_list = self.model(pcds_xyzi.squeeze(0), pcds_coord.squeeze(0), pcds_sphere_coord.squeeze(0))
+        pred_list = self.model(pcds_xyzi.squeeze(0), pcds_coord.squeeze(0), pcds_sphere_coord.squeeze(0),
+                               shifted_pcds=shifted_pcds.squeeze(0), mapping_mat=mapping_mat)
         
         pc_offset_weight = get_fg_pc_offset_weight(pcds_ins_label[0])
 
         pred_panoptic_list = []
         
         for i, (pred_sem, pred_offset, pred_hmap) in enumerate(pred_list):
+            pred_sem = pred_sem[:, :, :mapping_mat['n_0'][0]]
+            pred_offset = pred_offset[:, :mapping_mat['n_0'][0]]
+            pred_hmap = pred_hmap[:, :mapping_mat['n_0'][0]]
             # calculate offset loss
-            loss_point = (pred_offset - pcds_offset[0]).pow(2).sum(dim=2, keepdim=True).sqrt() #(BS, N, 1)
+            loss_point = (pred_offset - pcds_offset[0][:, :mapping_mat['n_0'][0]]).pow(2).sum(dim=2, keepdim=True).sqrt() #(BS, N, 1)
             loss_offset = (loss_point).mean()
             if i == 0:
                 offset_loss.append(loss_offset)
@@ -234,7 +242,7 @@ class ModelRunnerSemKITTI(trainer.ADDistTrainer):
             pred_hmap = pred_hmap.mean(dim=0).squeeze(1)
 
             # make result
-            pred_obj_center, pred_panoptic = self.pv_nms(pcds_xyzi[0, 0, :3, :, 0].T.contiguous(), pred_sem, pred_offset, pred_hmap)
+            pred_obj_center, pred_panoptic = self.pv_nms(pcds_xyzi[0, 0, :3, :mapping_mat['n_0'][0], 0].T.contiguous(), pred_sem, pred_offset, pred_hmap)
             pred_panoptic = pred_panoptic.cpu().numpy().astype(np.uint32)
             
             pred_panoptic_list.append(pred_panoptic)
@@ -279,7 +287,7 @@ class ModelRunnerSemKITTI(trainer.ADDistTrainer):
                 for key in metric_pano:
                     record_dic["{}_{}".format(key, i)] = metric_pano[key]
             record_dic["offset_loss"] = (sum(offset_loss) / len(offset_loss)).item()
-            record_dic["offset_loss_raw"] = (sum(offset_loss_raw) / len(offset_loss_raw)).item()            
+            # record_dic["offset_loss_raw"] = (sum(offset_loss_raw) / len(offset_loss_raw)).item()            
             with open(os.path.join(self.test_save_path, "metric.yaml"), "w") as f:
                 yaml.dump(record_dic, f)
                 

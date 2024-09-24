@@ -495,7 +495,7 @@ class DataloadVal(Dataset):
                     
         # merge pcds and labels
         pcds_total = np.concatenate((pcds, final_pcds_label_use[:mapping_mat['n_0']][:, np.newaxis], final_pcds_ins_label[:mapping_mat['n_0']][:, np.newaxis]), axis=1)
-        pano_label = (final_pcds_ins_label[:mapping_mat['n_0']:] << 16) + final_pcds_label_use[:mapping_mat['n_0']:]
+        pano_label = (inst_label << 16) + final_pcds_label_use[:mapping_mat['n_0']]
         
         # prev pcds total
         prev_pcds_total = []
@@ -530,7 +530,7 @@ class DataloadVal(Dataset):
                     pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset = self.form_batch(pcds_tmp[:-mapping_mat['n_1']])
                 else:
                     pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset = self.form_batch(pcds_tmp[:mapping_mat['n_0']])
-                    shifted_pcds = None
+                    shifted_pcds = torch.zeros_like(shifted_pcds)
 
                 pcds_xyzi_list.append(pcds_xyzi)
                 pcds_coord_list.append(pcds_coord)

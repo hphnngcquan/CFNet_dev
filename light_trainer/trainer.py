@@ -446,7 +446,7 @@ class ADDistTrainer:
         self.model = model
         # resume from checkpoint
         if ckpt_path is not None:
-            self.load_from_checkpoint(ckpt_path, is_load_optimizer=False, is_load_scheduler=False)
+            self.load_from_checkpoint(ckpt_path, is_load_optimizer=False, is_load_scheduler=False) #TODO strict=False, this must not be used in the final product
         
         # test epoch end
         self.sync_all_process()

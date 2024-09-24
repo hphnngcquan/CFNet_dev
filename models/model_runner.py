@@ -16,7 +16,7 @@ import collections
 import yaml
 import os
 
-import pdb
+from datasets.utils import draw_point_with
 
 offset_loss_raw = []
 offset_loss = []
@@ -106,15 +106,17 @@ class ModelRunnerSemKITTI(trainer.ADDistTrainer):
             pcds_sem_label, pcds_sem_label_raw, pcds_ins_label, pcds_ins_label_raw (BS, N, 1)
             pcds_offset, pcds_offset_raw (BS, N, 3)
         '''
-        pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset,\
-        pcds_xyzi_raw, pcds_coord_raw, pcds_sphere_coord_raw, pcds_sem_label_raw, pcds_ins_label_raw, pcds_offset_raw, seq_id, fn = batch
+        pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset, shifted_pcds,\
+        pcds_xyzi_raw, pcds_coord_raw, pcds_sphere_coord_raw, pcds_sem_label_raw, pcds_ins_label_raw, pcds_offset_raw, shifted_pcds_raw, mapping_mat, seq_id, fn = batch
         
         batch_size = pcds_xyzi.shape[0]
         # forward
         pcds_xyzi_total = torch.cat((pcds_xyzi, pcds_xyzi_raw), dim=0)
         pcds_coord_total = torch.cat((pcds_coord, pcds_coord_raw), dim=0)
         pcds_sphere_coord_total = torch.cat((pcds_sphere_coord, pcds_sphere_coord_raw), dim=0)
-        pred_list_total = self.model(pcds_xyzi_total, pcds_coord_total, pcds_sphere_coord_total)
+        shifted_pcds = torch.cat((shifted_pcds, shifted_pcds_raw), dim=0)
+        pred_list_total = self.model(pcds_xyzi_total, pcds_coord_total, pcds_sphere_coord_total, 
+                                     shifted_pcds=shifted_pcds, mapping_mat=mapping_mat)
 
         pred_list = []
         pred_list_raw = []

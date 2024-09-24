@@ -6,7 +6,7 @@ n_past_steps = 2
 def get_config():
     class General:
         name = reduce(lambda x,y:os.path.join(x,y), __name__.rsplit("/")[-1].split('.')[1:])
-        batch_size_per_gpu = 2
+        batch_size_per_gpu = 1
 
         OffsetDir = './data/OffsetKITTI/dataset/sequences'
         SeqDir = './data/SemanticKITTI/dataset/sequences'
@@ -70,7 +70,7 @@ def get_config():
             center_type = General.center_type
     
     class ModelParam:
-        type = "models.cfnet.CFNet"
+        type = "models.cfnet.CFNet_Shifted"
         runner_type = "models.model_runner.ModelRunnerSemKITTI"
         score_thresh = 0.2
         category_list = General.category_list
@@ -78,6 +78,8 @@ def get_config():
         class_num = len(General.category_list) + 1
         point_nms_dic = General.point_nms_dic
         point_feat_out_channels = 64
+        auxiliary=True
+        cffe_used=False
 
         class BEVParam:
             type = 'models.networks.fcn_2d.FCN2D'

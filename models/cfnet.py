@@ -196,15 +196,31 @@ class CFNet_Shifted(nn.Module):
     
     def build_network(self):
         # build network
+        # TODO
+        tm_emb_dim = self.pModel.time_embedding_dim
+        T = self.pModel.n_past_pcls + 1
+        # TODO
+        
         bev_net_cfg = self.pModel.BEVParam
         rv_net_cfg = self.pModel.RVParam
         bev_base_channels = bev_net_cfg.base_channels
 
         fusion_cfg = self.pModel.FusionParam
-
+        # TODO
+        self.time_embedding = nn.ParameterList(
+                [nn.Parameter(torch.randn(tm_emb_dim)) for _ in range(T)]
+            )
+        
+        
+        self.point_pre_sub = nn.Sequential(
+            backbone.bn_conv1x1_bn_relu(7, tm_emb_dim),
+            backbone.conv1x1_bn_relu(tm_emb_dim, tm_emb_dim)
+        )
+        # TODO
+        
         # base network
         self.point_pre = nn.Sequential(
-            backbone.bn_conv1x1_bn_relu(7, bev_base_channels[0]),
+            backbone.bn_conv1x1_bn_relu(18, bev_base_channels[0]), # TODO
             backbone.conv1x1_bn_relu(bev_base_channels[0], bev_base_channels[0])
         )
 
@@ -270,8 +286,21 @@ class CFNet_Shifted(nn.Module):
             pred_offset (BS, N, 3)
             pred_hmap (BS, N, 1)
         '''
+        # TODO check the order of mapping mat and the original point cloud
+        # TODO currently batch size equal 0, but evaluate when batch size is larger than 0
+        fuse_emb_mark = torch.zeros(pcds_xyzi.shape[2], dtype=torch.int32)  # Initialize the marking tensor with zeros
+
+        # Loop through mapping_mat
+        for mapping_i, (_, map_val) in enumerate(mapping_mat.items()):
+            fuse_emb_mark[:map_val[0]] = mapping_i
+        
+        pcds_xyzi_sub = self.point_pre_sub(pcds_xyzi) # from B,7,N,1 to B,18,N,1
+        
+        for tm, fuse_ebd_feat in enumerate(self.time_embedding):
+            pcds_xyzi_sub[:, :, fuse_emb_mark == tm, :] += fuse_ebd_feat
+            
         pcds_coord_wl = pcds_coord[:, :, :2].contiguous()
-        point_feat_tmp = self.point_pre(pcds_xyzi) #c = 64
+        point_feat_tmp = self.point_pre(pcds_xyzi_sub) #c = 64
 
         # BEV network
         bev_input = self.point2bev(point_feat_tmp, pcds_coord_wl)

@@ -307,7 +307,7 @@ class DataloadTrain(Dataset):
         shifted_pcds_raw = torch.FloatTensor(pcds_for_aug_raw[-mapping_mat['n_1']:][:, :3].astype(np.float32)).transpose(1, 0).contiguous().unsqueeze(-1)
         
         # TODO
-        mapping_mat["n_2"] = prev_pcds_total[:-mapping_mat['n_1']].shape[0]
+        mapping_mat["n_2"] = pcds_for_aug[mapping_mat['n_0']:-mapping_mat['n_1']].shape[0] - pcds_for_aug[-mapping_mat['n_1']:].shape[0]
         
         # preprocess
         if self.align and (int(fn[:-4]) > 0):
@@ -513,7 +513,7 @@ class DataloadVal(Dataset):
         pcds_for_aug = np.concatenate((pcds_total.copy(), np.concatenate(prev_pcds_total.copy()), shifted_pcds), axis=0)
         
         # TODO
-        mapping_mat["n_2"] = prev_pcds_total[:-mapping_mat['n_1']].shape[0]
+        mapping_mat["n_2"] = pcds_for_aug[mapping_mat["n_0"]:-mapping_mat['n_1']].shape[0] - pcds_for_aug[-mapping_mat['n_1']:].shape[0]
         
         # data aug
         pcds_xyzi_list = []
@@ -708,7 +708,7 @@ class DataloadTest(Dataset):
         pcds_for_aug = np.concatenate((pcds.copy(), np.concatenate(prev_pcds_total.copy()), shifted_pcds), axis=0)
         
         # TODO
-        mapping_mat["n_2"] = prev_pcds_total[:-mapping_mat['n_1']].shape[0]
+        mapping_mat["n_2"] = pcds_for_aug[mapping_mat["n_0"]:-mapping_mat['n_1']].shape[0] - pcds_for_aug[-mapping_mat['n_1']:].shape[0]
 
         # data aug
         pcds_xyzi_list = []

@@ -208,7 +208,7 @@ class CFNet_Shifted(nn.Module):
         fusion_cfg = self.pModel.FusionParam
         # TODO
         self.time_embedding = nn.ParameterList(
-                [nn.Parameter(torch.randn(tm_emb_dim)) for _ in range(T)]
+                [nn.Parameter(torch.randn(1, tm_emb_dim, 1, 1)) for _ in range(T)]
             )
         
         
@@ -288,16 +288,21 @@ class CFNet_Shifted(nn.Module):
         '''
         # TODO check the order of mapping mat and the original point cloud
         # TODO currently batch size equal 0, but evaluate when batch size is larger than 0
-        fuse_emb_mark = torch.zeros(pcds_xyzi.shape[2], dtype=torch.int32)  # Initialize the marking tensor with zeros
+        fuse_emb_mark = []  # Initialize the marking tensor with zeros
 
         # Loop through mapping_mat
         for mapping_i, (_, map_val) in enumerate(mapping_mat.items()):
-            fuse_emb_mark[:map_val[0]] = mapping_i
+            fuse_emb_mark.append(torch.ones(map_val) * mapping_i)
+        fuse_emb_mark = torch.cat(fuse_emb_mark, dim=0).long().to(pcds_xyzi.device)
         
         pcds_xyzi_sub = self.point_pre_sub(pcds_xyzi) # from B,7,N,1 to B,18,N,1
         
         for tm, fuse_ebd_feat in enumerate(self.time_embedding):
-            pcds_xyzi_sub[:, :, fuse_emb_mark == tm, :] += fuse_ebd_feat
+            # Expand the time embedding to match the batch size (B)
+            fuse_ebd_feat_exp = fuse_ebd_feat.expand(pcds_xyzi_sub.size(0), -1, -1, -1)
+            
+            # Apply the embedding to the selected points in pcds_xyzi_sub
+            pcds_xyzi_sub[:, :, fuse_emb_mark == tm, :] += fuse_ebd_feat_exp
             
         pcds_coord_wl = pcds_coord[:, :, :2].contiguous()
         point_feat_tmp = self.point_pre(pcds_xyzi_sub) #c = 64

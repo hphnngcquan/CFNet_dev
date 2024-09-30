@@ -201,12 +201,32 @@ class CFNet_Shifted(nn.Module):
         bev_base_channels = bev_net_cfg.base_channels
 
         fusion_cfg = self.pModel.FusionParam
+        
+        tm_emb_dim = self.pModel.time_embedding_dim
+        T = self.pModel.n_past_pcls + 1
+        
+        if tm_emb_dim:
 
-        # base network
-        self.point_pre = nn.Sequential(
-            backbone.bn_conv1x1_bn_relu(7, bev_base_channels[0]),
-            backbone.conv1x1_bn_relu(bev_base_channels[0], bev_base_channels[0])
-        )
+            self.time_embedding = nn.ParameterList(
+                    [nn.Parameter(torch.randn(1, tm_emb_dim, 1, 1)) for _ in range(T)]
+                )
+
+
+            self.point_pre_sub = nn.Sequential(
+                backbone.conv1x1(7, tm_emb_dim),
+            )
+            
+            # base network
+            self.point_pre = nn.Sequential(
+                backbone.bn_conv1x1_bn_relu(tm_emb_dim, bev_base_channels[0]),
+                backbone.conv1x1_bn_relu(bev_base_channels[0], bev_base_channels[0])
+            )
+        else:
+            # base network
+            self.point_pre = nn.Sequential(
+                backbone.bn_conv1x1_bn_relu(7, bev_base_channels[0]),
+                backbone.conv1x1_bn_relu(bev_base_channels[0], bev_base_channels[0])
+            )
 
         # BEV network
         self.point2bev = get_module(bev_net_cfg.P2VParam)
@@ -271,7 +291,26 @@ class CFNet_Shifted(nn.Module):
             pred_hmap (BS, N, 1)
         '''
         pcds_coord_wl = pcds_coord[:, :, :2].contiguous()
-        point_feat_tmp = self.point_pre(pcds_xyzi) #c = 64
+        
+        if hasattr(self, 'time_embedding'):
+            fuse_emb_mark = torch.cat([torch.ones(map_val, device=pcds_xyzi.device) * mapping_i 
+                                        for mapping_i, (_, map_val) in enumerate(mapping_mat.items())], dim=0).long()
+
+            # Precompute time embedding expansions for all time steps
+            fuse_ebd_feat_expanded = [fuse_ebd_feat.expand(pcds_xyzi.size(0), -1, -1, -1) for fuse_ebd_feat in self.time_embedding]
+
+            pcds_xyzi_sub = self.point_pre_sub(pcds_xyzi) # from B,7,N,1 to B,18,N,1
+
+            for tm, fuse_ebd_feat_exp in enumerate(fuse_ebd_feat_expanded):
+                # Create a mask for this time embedding
+                mask = (fuse_emb_mark == tm).unsqueeze(0).unsqueeze(1).unsqueeze(-1)  # Shape: (1, 1, N, 1)
+
+                # Update only the points that correspond to this time step
+                pcds_xyzi_sub = pcds_xyzi_sub + fuse_ebd_feat_exp * mask
+            
+            point_feat_tmp = self.point_pre(pcds_xyzi_sub) #c = 64
+        else:
+            point_feat_tmp = self.point_pre(pcds_xyzi)
 
         # BEV network
         bev_input = self.point2bev(point_feat_tmp, pcds_coord_wl)

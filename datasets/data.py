@@ -306,6 +306,8 @@ class DataloadTrain(Dataset):
         shifted_pcds = torch.FloatTensor(pcds_for_aug[-mapping_mat['n_1']:][:, :3].astype(np.float32)).transpose(1, 0).contiguous().unsqueeze(-1)
         shifted_pcds_raw = torch.FloatTensor(pcds_for_aug_raw[-mapping_mat['n_1']:][:, :3].astype(np.float32)).transpose(1, 0).contiguous().unsqueeze(-1)
         
+        mapping_mat["n_2"] = pcds_for_aug[mapping_mat['n_0']:-mapping_mat['n_1']].shape[0] - pcds_for_aug[-mapping_mat['n_1']:].shape[0]
+        
         # preprocess
         if self.align and (int(fn[:-4]) > 0):
             pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset = self.form_batch(pcds_for_aug[:-mapping_mat['n_1']])
@@ -317,6 +319,7 @@ class DataloadTrain(Dataset):
             # because fn is 0, there is not prev shifted pcds
             shifted_pcds = torch.zeros_like(shifted_pcds)
             shifted_pcds_raw = torch.zeros_like(shifted_pcds_raw)
+            mapping_mat['n_1'] = 0
         
         
 
@@ -509,6 +512,8 @@ class DataloadVal(Dataset):
         shifted_pcds = np.concatenate((shifted_pcds, np.zeros((shifted_pcds.shape[0], (pcds_total.shape[-1] - shifted_pcds.shape[-1])))), axis=1)
         pcds_for_aug = np.concatenate((pcds_total.copy(), np.concatenate(prev_pcds_total.copy()), shifted_pcds), axis=0)
         
+        mapping_mat["n_2"] = pcds_for_aug[mapping_mat["n_0"]:-mapping_mat['n_1']].shape[0] - pcds_for_aug[-mapping_mat['n_1']:].shape[0]
+        
         # data aug
         pcds_xyzi_list = []
         pcds_coord_list = []
@@ -531,6 +536,7 @@ class DataloadVal(Dataset):
                 else:
                     pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset = self.form_batch(pcds_tmp[:mapping_mat['n_0']])
                     shifted_pcds = torch.zeros_like(shifted_pcds)
+                    mapping_mat['n_1'] = 0
 
                 pcds_xyzi_list.append(pcds_xyzi)
                 pcds_coord_list.append(pcds_coord)
@@ -700,6 +706,8 @@ class DataloadTest(Dataset):
         
         shifted_pcds = np.concatenate((shifted_pcds, np.zeros((shifted_pcds.shape[0], (pcds.shape[-1] - shifted_pcds.shape[-1])))), axis=1)
         pcds_for_aug = np.concatenate((pcds.copy(), np.concatenate(prev_pcds_total.copy()), shifted_pcds), axis=0)
+        
+        mapping_mat["n_2"] = pcds_for_aug[mapping_mat["n_0"]:-mapping_mat['n_1']].shape[0] - pcds_for_aug[-mapping_mat['n_1']:].shape[0]
 
         # data aug
         pcds_xyzi_list = []
@@ -719,7 +727,8 @@ class DataloadTest(Dataset):
                     pcds_xyzi, pcds_coord, pcds_sphere_coord = self.form_batch(pcds_tmp[:-mapping_mat['n_1']])
                 else:
                     pcds_xyzi, pcds_coord, pcds_sphere_coord = self.form_batch(pcds_tmp[:mapping_mat['n_0']])
-                    shifted_pcds = None
+                    shifted_pcds = torch.zeros_like(shifted_pcds)
+                    mapping_mat['n_1'] = 0
 
                 pcds_xyzi_list.append(pcds_xyzi)
                 pcds_coord_list.append(pcds_coord)

@@ -294,18 +294,27 @@ class ModelRunnerSemKITTI(trainer.ADDistTrainer):
     @torch.no_grad()
     def predict_step(self, batch_idx, batch):
         generate_offset = False
-        pcds_xyzi, pcds_coord, pcds_sphere_coord, seq_id, fn = batch
+        test = False
+        if test:
+            pcds_xyzi, pcds_coord, pcds_sphere_coord, shifted_pcds, mapping_mat, seq_id, fn = batch
+        else:
+            pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset, pano_label, shifted_pcds, mapping_mat, seq_id, fn = batch
 
-        pred_list = self.model(pcds_xyzi.squeeze(0), pcds_coord.squeeze(0), pcds_sphere_coord.squeeze(0))
+        pred_list = self.model(pcds_xyzi.squeeze(0), pcds_coord.squeeze(0), pcds_sphere_coord.squeeze(0),
+                               shifted_pcds=shifted_pcds.squeeze(0), mapping_mat=mapping_mat)
 
         pred_panoptic_list = []
         for i, (pred_sem, pred_offset, pred_hmap) in enumerate(pred_list):
+            pred_sem = pred_sem[:, :, :mapping_mat['n_0'][0]]
+            pred_offset = pred_offset[:, :mapping_mat['n_0'][0]]
+            pred_hmap = pred_hmap[:, :mapping_mat['n_0'][0]]
+            
             pred_sem = F.softmax(pred_sem, dim=1).mean(dim=0).permute(2, 1, 0).contiguous()[0]
             pred_offset = merge_offset_tta(pred_offset)
             pred_hmap = pred_hmap.mean(dim=0).squeeze(1)
 
             # make result
-            pred_obj_center, pred_panoptic = self.pv_nms(pcds_xyzi[0, 0, :3, :, 0].T.contiguous(), pred_sem, pred_offset, pred_hmap)
+            pred_obj_center, pred_panoptic = self.pv_nms(pcds_xyzi[0, 0, :3, :mapping_mat['n_0'][0], 0].T.contiguous(), pred_sem, pred_offset, pred_hmap)
             if i == 0 and  generate_offset:
                 assert pred_offset.shape[0] == pcds_xyzi.shape[3]
                 pred_offset_save = pred_offset * (pred_hmap.unsqueeze(1) > self.pModel.score_thresh).float()

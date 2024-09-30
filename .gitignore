@@ -11,3 +11,4 @@ Pipfile
 *.label
 .mypy_cache/
 data/
+data/*

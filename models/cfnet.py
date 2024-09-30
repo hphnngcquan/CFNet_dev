@@ -213,14 +213,13 @@ class CFNet_Shifted(nn.Module):
         
         
         self.point_pre_sub = nn.Sequential(
-            backbone.bn_conv1x1_bn_relu(7, tm_emb_dim),
-            backbone.conv1x1_bn_relu(tm_emb_dim, tm_emb_dim)
+            backbone.conv1x1(7, tm_emb_dim),
         )
         # TODO
         
         # base network
         self.point_pre = nn.Sequential(
-            backbone.bn_conv1x1_bn_relu(18, bev_base_channels[0]), # TODO
+            backbone.bn_conv1x1_bn_relu(tm_emb_dim, bev_base_channels[0]), # TODO
             backbone.conv1x1_bn_relu(bev_base_channels[0], bev_base_channels[0])
         )
 
@@ -288,22 +287,22 @@ class CFNet_Shifted(nn.Module):
         '''
         # TODO check the order of mapping mat and the original point cloud
         # TODO currently batch size equal 0, but evaluate when batch size is larger than 0
-        fuse_emb_mark = []  # Initialize the marking tensor with zeros
+        # Precompute the fuse_emb_mark as a single tensor
+        fuse_emb_mark = torch.cat([torch.ones(map_val, device=pcds_xyzi.device) * mapping_i 
+                                    for mapping_i, (_, map_val) in enumerate(mapping_mat.items())], dim=0).long()
 
-        # Loop through mapping_mat
-        for mapping_i, (_, map_val) in enumerate(mapping_mat.items()):
-            fuse_emb_mark.append(torch.ones(map_val) * mapping_i)
-        fuse_emb_mark = torch.cat(fuse_emb_mark, dim=0).long().to(pcds_xyzi.device)
+        # Precompute time embedding expansions for all time steps
+        fuse_ebd_feat_expanded = [fuse_ebd_feat.expand(pcds_xyzi.size(0), -1, -1, -1) for fuse_ebd_feat in self.time_embedding]
         
         pcds_xyzi_sub = self.point_pre_sub(pcds_xyzi) # from B,7,N,1 to B,18,N,1
         
-        for tm, fuse_ebd_feat in enumerate(self.time_embedding):
-            # Expand the time embedding to match the batch size (B)
-            fuse_ebd_feat_exp = fuse_ebd_feat.expand(pcds_xyzi_sub.size(0), -1, -1, -1)
+        for tm, fuse_ebd_feat_exp in enumerate(fuse_ebd_feat_expanded):
+            # Create a mask for this time embedding
+            mask = (fuse_emb_mark == tm).unsqueeze(0).unsqueeze(1).unsqueeze(-1)  # Shape: (1, 1, N, 1)
             
-            # Apply the embedding to the selected points in pcds_xyzi_sub
-            pcds_xyzi_sub[:, :, fuse_emb_mark == tm, :] += fuse_ebd_feat_exp
-            
+            # Update only the points that correspond to this time step
+            pcds_xyzi_sub = pcds_xyzi_sub + fuse_ebd_feat_exp * mask
+                    
         pcds_coord_wl = pcds_coord[:, :, :2].contiguous()
         point_feat_tmp = self.point_pre(pcds_xyzi_sub) #c = 64
 

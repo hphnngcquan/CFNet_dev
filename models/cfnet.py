@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import numpy as np
 
 from .networks import backbone
+from .networks.fusion_module import SpatialAttention_mtf
 from . import common_utils
 
 from utils.config_parser import get_module
@@ -203,6 +204,7 @@ class CFNet_Shifted(nn.Module):
         fusion_cfg = self.pModel.FusionParam
         
         tm_emb_dim = self.pModel.time_embedding_dim
+        attn_map = self.pModel.attn_map
         T = self.pModel.n_past_pcls + 1
         
         if tm_emb_dim:
@@ -227,7 +229,9 @@ class CFNet_Shifted(nn.Module):
                 backbone.bn_conv1x1_bn_relu(7, bev_base_channels[0]),
                 backbone.conv1x1_bn_relu(bev_base_channels[0], bev_base_channels[0])
             )
-
+        if attn_map:
+            self.attn_bev = SpatialAttention_mtf()
+            self.attn_rv = SpatialAttention_mtf()
         # BEV network
         self.point2bev = get_module(bev_net_cfg.P2VParam)
         self.bev_net = get_module(bev_net_cfg)
@@ -291,6 +295,7 @@ class CFNet_Shifted(nn.Module):
             pred_hmap (BS, N, 1)
         '''
         pcds_coord_wl = pcds_coord[:, :, :2].contiguous()
+        pcds_coord_wl_0 = pcds_coord[:, :mapping_mat['n_0'][0], :2].contiguous()
         
         if hasattr(self, 'time_embedding'):
             fuse_emb_mark = torch.cat([torch.ones(map_val, device=pcds_xyzi.device) * mapping_i 
@@ -312,6 +317,15 @@ class CFNet_Shifted(nn.Module):
         else:
             point_feat_tmp = self.point_pre(pcds_xyzi)
 
+        if hasattr(self, 'attn'):
+            assert pcds_coord_wl_0.shape[1] == pcds_sphere_coord[:, :mapping_mat['n_0'][0], :, :].shape[1] == mapping_mat['n_0'][0]
+            # mapping point_feat_tmp
+            point_feat_temp_0 = point_feat_tmp[:,:,:mapping_mat['n_0'][0],:].clone()
+            bev_input_0 = self.point2bev(point_feat_temp_0, pcds_coord_wl_0)
+            attn_map_bev = self.attn_bev(bev_input_0)
+            rv_input_0 = self.point2rv(point_feat_temp_0, pcds_sphere_coord[:, :mapping_mat['n_0'][0], :, :])
+            attn_map_bev = self.attn_rv(rv_input_0)
+        
         # BEV network
         bev_input = self.point2bev(point_feat_tmp, pcds_coord_wl)
         bev_feat_sem, bev_feat_ins = self.bev_net(bev_input)
@@ -328,6 +342,7 @@ class CFNet_Shifted(nn.Module):
 
         # stage0
         # sem branch
+        # TODO multiply attentiuon map here
         point_feat_sem = self.point_fusion_sem(point_feat_tmp, point_bev_sem, point_rv_sem)
         pred_sem = self.pred_layer_sem(point_feat_sem).float()
 

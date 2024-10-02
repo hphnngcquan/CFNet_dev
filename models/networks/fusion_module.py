@@ -9,8 +9,9 @@ import pdb
 class SpatialAttention_mtf(nn.Module):
     def __init__(self, kernel_size=7):
         super(SpatialAttention_mtf, self).__init__()
-
-        self.conv1 = nn.Conv2d(2, 1, kernel_size, padding=kernel_size // 2, bias=False)
+        
+        # TODO consider change to backbone.conv1x1_bn(2, 1)
+        # self.conv1 = nn.Conv2d(2, 1, kernel_size, padding=kernel_size // 2, bias=False)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, curr, prev):

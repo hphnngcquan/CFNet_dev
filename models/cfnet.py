@@ -230,6 +230,9 @@ class CFNet_Shifted(nn.Module):
                 backbone.conv1x1_bn_relu(bev_base_channels[0], bev_base_channels[0])
             )
         if attn_map:
+            attn_cfg = self.pModel.AttnParam
+            self.point2bev_attn = get_module(attn_cfg.BEVParam.P2VParam)
+            self.point2rv_attn = get_module(attn_cfg.RVParam.P2VParam)
             self.attn_bev = SpatialAttention_mtf()
             self.attn_rv = SpatialAttention_mtf()
         # BEV network
@@ -321,33 +324,33 @@ class CFNet_Shifted(nn.Module):
             assert pcds_coord_wl_0.shape[1] == pcds_sphere_coord[:, :mapping_mat['n_0'][0], :, :].shape[1] == mapping_mat['n_0'][0]
             # mapping point_feat_tmp
             point_feat_temp_0 = point_feat_tmp[:,:,:mapping_mat['n_0'][0],:].clone()
-            bev_input_0 = self.point2bev(point_feat_temp_0, pcds_coord_wl_0)
-            attn_map_bev = self.attn_bev(bev_input_0)
-            rv_input_0 = self.point2rv(point_feat_temp_0, pcds_sphere_coord[:, :mapping_mat['n_0'][0], :, :])
-            attn_map_bev = self.attn_rv(rv_input_0)
+            bev_input_0 = self.point2bev_attn(point_feat_temp_0, pcds_coord_wl_0) 
+            attn_map_bev = self.attn_bev(bev_input_0) # B,1,300,300
+            rv_input_0 = self.point2rv_attn(point_feat_temp_0, pcds_sphere_coord[:, :mapping_mat['n_0'][0], :, :])
+            attn_map_rv = self.attn_rv(rv_input_0) # B,1,64,1024
         
         # BEV network
         bev_input = self.point2bev(point_feat_tmp, pcds_coord_wl)
         bev_feat_sem, bev_feat_ins = self.bev_net(bev_input)
 
-        point_bev_sem = self.bev2point(bev_feat_sem, pcds_coord_wl)
-        point_bev_ins = self.bev2point(bev_feat_ins, pcds_coord_wl)
+        point_bev_sem = self.bev2point(bev_feat_sem * attn_map_bev, pcds_coord_wl)
+        point_bev_ins = self.bev2point(bev_feat_ins * attn_map_bev, pcds_coord_wl)
 
         # RV network
         rv_input = self.point2rv(point_feat_tmp, pcds_sphere_coord)
         rv_feat_sem, rv_feat_ins = self.rv_net(rv_input)
 
-        point_rv_sem = self.rv2point(rv_feat_sem, pcds_sphere_coord)
-        point_rv_ins = self.rv2point(rv_feat_ins, pcds_sphere_coord)
+        point_rv_sem = self.rv2point(rv_feat_sem * attn_map_rv, pcds_sphere_coord)
+        point_rv_ins = self.rv2point(rv_feat_ins * attn_map_rv, pcds_sphere_coord)
 
         # stage0
         # sem branch
         # TODO multiply attentiuon map here
-        point_feat_sem = self.point_fusion_sem(point_feat_tmp, point_bev_sem, point_rv_sem)
+        point_feat_sem = self.point_fusion_sem(point_feat_tmp, point_bev_sem, point_rv_sem) #TODO try point_feat_tmp_0 if point_feat_tmp is not good enough
         pred_sem = self.pred_layer_sem(point_feat_sem).float()
 
         # ins branch
-        point_feat_ins = self.point_fusion_ins(point_feat_tmp, point_bev_ins, point_rv_ins)
+        point_feat_ins = self.point_fusion_ins(point_feat_tmp, point_bev_ins, point_rv_ins) #TODO try point_feat_tmp_0 if point_feat_tmp is not good enough
         pred_offset = self.pred_layer_offset(point_feat_ins).float().squeeze(-1).transpose(1, 2).contiguous()
         pred_hmap = self.pred_layer_hmap(point_feat_ins).float().squeeze(1)
 

@@ -83,6 +83,19 @@ def get_config():
         attn_map = True
         auxiliary=True
         cffe_used=False
+        
+        class AttnParam:
+            class BEVParam:
+                class P2VParam:
+                    type = 'models.networks.point2voxel.VMPModule'
+                    output_size = [General.Voxel.bev_shape[0] // 2, General.Voxel.bev_shape[1] // 2]
+                    scale_rate = [0.5, 0.5]
+            class RVParam:
+                class P2VParam:
+                        type = 'models.networks.point2voxel.VMPModule'
+                        output_size = [General.Voxel.rv_shape[0], General.Voxel.rv_shape[1] // 2]
+                        scale_rate = [1.0, 0.5]
+            
 
         class BEVParam:
             type = 'models.networks.fcn_2d.FCN2D'

@@ -213,7 +213,8 @@ class CFNet_Shifted(nn.Module):
 
 
             self.point_pre_sub = nn.Sequential(
-                backbone.conv1x1(7, tm_emb_dim),
+                backbone.bn_conv1x1_bn_relu(7, tm_emb_dim),
+                backbone.conv1x1_bn_relu(tm_emb_dim, tm_emb_dim)
             )
             
             # base network

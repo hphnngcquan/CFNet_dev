@@ -536,7 +536,6 @@ class DataloadVal(Dataset):
                 else:
                     pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset = self.form_batch(pcds_tmp[:mapping_mat['n_0']])
                     shifted_pcds = torch.zeros_like(shifted_pcds)
-                    mapping_mat['n_1'] = 0
 
                 pcds_xyzi_list.append(pcds_xyzi)
                 pcds_coord_list.append(pcds_coord)
@@ -545,7 +544,9 @@ class DataloadVal(Dataset):
                 pcds_ins_label_list.append(pcds_ins_label)
                 pcds_offset_list.append(pcds_offset)
                 shifted_pcds_list.append(shifted_pcds)
-        
+                
+        if self.align and (int(fn[:-4]) <= 0):
+            mapping_mat['n_1'] = 0
         pcds_xyzi = torch.stack(pcds_xyzi_list, dim=0)
         pcds_coord = torch.stack(pcds_coord_list, dim=0)
         pcds_sphere_coord = torch.stack(pcds_sphere_coord_list, dim=0)
@@ -728,13 +729,14 @@ class DataloadTest(Dataset):
                 else:
                     pcds_xyzi, pcds_coord, pcds_sphere_coord = self.form_batch(pcds_tmp[:mapping_mat['n_0']])
                     shifted_pcds = torch.zeros_like(shifted_pcds)
-                    mapping_mat['n_1'] = 0
 
                 pcds_xyzi_list.append(pcds_xyzi)
                 pcds_coord_list.append(pcds_coord)
                 pcds_sphere_coord_list.append(pcds_sphere_coord)
                 shifted_pcds_list.append(shifted_pcds)
-        
+                
+        if self.align and (int(fn[:-4]) <= 0):
+            mapping_mat['n_1'] = 0 
         pcds_xyzi = torch.stack(pcds_xyzi_list, dim=0)
         pcds_coord = torch.stack(pcds_coord_list, dim=0)
         pcds_sphere_coord = torch.stack(pcds_sphere_coord_list, dim=0)

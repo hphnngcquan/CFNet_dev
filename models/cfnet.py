@@ -211,15 +211,10 @@ class CFNet_Shifted(nn.Module):
                     [nn.Parameter(torch.randn(1, tm_emb_dim, 1, 1)) for _ in range(T)]
                 )
 
-
-            self.point_pre_sub = nn.Sequential(
-                backbone.bn_conv1x1_bn_relu(7, tm_emb_dim),
-                backbone.conv1x1_bn_relu(tm_emb_dim, tm_emb_dim)
-            )
             
             # base network
             self.point_pre = nn.Sequential(
-                backbone.bn_conv1x1_bn_relu(tm_emb_dim, bev_base_channels[0]),
+                backbone.bn_conv1x1_bn_relu(7, bev_base_channels[0]),
                 backbone.conv1x1_bn_relu(bev_base_channels[0], bev_base_channels[0])
             )
         else:
@@ -300,16 +295,16 @@ class CFNet_Shifted(nn.Module):
             # Precompute time embedding expansions for all time steps
             fuse_ebd_feat_expanded = [fuse_ebd_feat.expand(pcds_xyzi.size(0), -1, -1, -1) for fuse_ebd_feat in self.time_embedding]
 
-            pcds_xyzi_sub = self.point_pre_sub(pcds_xyzi) # from B,7,N,1 to B,18,N,1
+            point_feat_tmp = self.point_pre(pcds_xyzi) # from B,7,N,1 to B,18,N,1
 
             for tm, fuse_ebd_feat_exp in enumerate(fuse_ebd_feat_expanded):
                 # Create a mask for this time embedding
                 mask = (fuse_emb_mark == tm).unsqueeze(0).unsqueeze(1).unsqueeze(-1)  # Shape: (1, 1, N, 1)
 
                 # Update only the points that correspond to this time step
-                pcds_xyzi_sub = pcds_xyzi_sub + fuse_ebd_feat_exp * mask
+                point_feat_tmp = point_feat_tmp + fuse_ebd_feat_exp * mask
             
-            point_feat_tmp = self.point_pre(pcds_xyzi_sub) #c = 64
+            # point_feat_tmp = self.point_pre(pcds_xyzi_sub) #c = 64
         else:
             point_feat_tmp = self.point_pre(pcds_xyzi)
 

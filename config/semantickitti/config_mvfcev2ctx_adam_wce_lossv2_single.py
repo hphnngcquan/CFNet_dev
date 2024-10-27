@@ -78,7 +78,7 @@ def get_config():
         class_num = len(General.category_list) + 1
         point_nms_dic = General.point_nms_dic
         point_feat_out_channels = 64
-        time_embedding_dim = 18
+        time_embedding_dim = None
         n_past_pcls = n_past_steps
         attn_map = True
         auxiliary=True

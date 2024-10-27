@@ -289,3 +289,27 @@ def draw_point_with(pcl, indices=None, name='pcl_img.png', s=1, pcl2=None, s2=1)
     ax.set_aspect('auto')
 
     plt.savefig(name)
+    
+import matplotlib.pyplot as plt
+import torch
+import os
+
+def save_feature_map(feature_map, base_filename='feat'):
+    # Ensure the input is a tensor
+    if not isinstance(feature_map, torch.Tensor):
+        raise ValueError("The feature map must be a PyTorch tensor.")
+
+    # Move tensor to CPU if necessary and convert to numpy
+    feature_map = feature_map.detach().cpu().numpy()
+
+    # Check if feature map has more than one channel
+    if feature_map.ndim == 4:  # Batch size x Channels x Height x Width
+        num_channels = feature_map.shape[1]
+        for i in range(num_channels):
+            plt.imsave(os.path.join(f"{base_filename}_channel_{i+1}.png"), feature_map[0, i], cmap='viridis')
+
+    elif feature_map.ndim == 3:  # Channels x Height x Width
+        num_channels = feature_map.shape[0]
+        for i in range(num_channels):
+            plt.imsave(os.path.join(f"{base_filename}_channel_{i+1}.png"), feature_map[i], cmap='viridis')
+

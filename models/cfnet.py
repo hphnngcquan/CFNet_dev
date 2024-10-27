@@ -7,7 +7,7 @@ import numpy as np
 from .networks import backbone
 from .networks.fusion_module import SpatialAttention_mtf
 from . import common_utils
-
+from datasets.utils import save_feature_map
 from utils.config_parser import get_module
 
 import pdb
@@ -320,13 +320,13 @@ class CFNet_Shifted(nn.Module):
         else:
             point_feat_tmp = self.point_pre(pcds_xyzi)
 
-        if hasattr(self, 'attn'):
+        if hasattr(self, 'attn_bev'):
             assert pcds_coord_wl_0.shape[1] == pcds_sphere_coord[:, :mapping_mat['n_0'][0], :, :].shape[1] == mapping_mat['n_0'][0]
             # mapping point_feat_tmp
             point_feat_temp_0 = point_feat_tmp[:,:,:mapping_mat['n_0'][0],:].clone()
             bev_input_0 = self.point2bev_attn(point_feat_temp_0, pcds_coord_wl_0) 
             attn_map_bev = self.attn_bev(bev_input_0) # B,1,300,300
-            rv_input_0 = self.point2rv_attn(point_feat_temp_0, pcds_sphere_coord[:, :mapping_mat['n_0'][0], :, :])
+            rv_input_0 = self.point2rv_attn(point_feat_temp_0, pcds_sphere_coord[:, :mapping_mat['n_0'][0], :, :].contiguous())
             attn_map_rv = self.attn_rv(rv_input_0) # B,1,64,1024
         
         # BEV network

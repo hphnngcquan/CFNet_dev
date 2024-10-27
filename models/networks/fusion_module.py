@@ -11,10 +11,10 @@ class SpatialAttention_mtf(nn.Module):
         super(SpatialAttention_mtf, self).__init__()
         
         # TODO consider change to backbone.conv1x1_bn(2, 1)
-        # self.conv1 = nn.Conv2d(2, 1, kernel_size, padding=kernel_size // 2, bias=False)
+        self.conv1 = nn.Conv2d(2, 1, kernel_size, padding=kernel_size // 2, bias=False)
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, curr, prev):
+    def forward(self, curr, prev=None):
         #  curr = (B,C,H,W)
         avg_out = torch.mean(curr, dim=1, keepdim=True) # (B,1,H,W)
         max_out, _ = torch.max(curr, dim=1, keepdim=True) # (B,1,H,W)

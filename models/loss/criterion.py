@@ -276,20 +276,23 @@ class PanopticLossv2_single(nn.Module):
         # seg loss
         loss_ce = self.criterion_seg(pred_sem, gt_sem)
         loss_lovasz = lovasz_softmax(pred_sem, gt_sem, ignore=self.ignore_index)
+        
+        if pred_offset != None:
+            # ins loss
+            valid_mask = (gt_sem != self.ignore_index)
+            fg_mask = (gt_ins_label >= 0)
+            pc_offset_weight = self.get_fg_pc_offset_weight(gt_ins_label)
 
-        # ins loss
-        valid_mask = (gt_sem != self.ignore_index)
-        fg_mask = (gt_ins_label >= 0)
-        pc_offset_weight = self.get_fg_pc_offset_weight(gt_ins_label)
+            valid_num = int(valid_mask.float().sum()) + 1e-12
+            fg_num = int(fg_mask.float().sum()) + 1e-12
 
-        valid_num = int(valid_mask.float().sum()) + 1e-12
-        fg_num = int(fg_mask.float().sum()) + 1e-12
+            loss_point = (pred_offset - gt_offset).pow(2).sum(dim=2, keepdim=True).sqrt() #(BS, N, 1)
+            gt_hmap = torch.exp(-1 * loss_point.detach().pow(2) / (2 * self.sigma * self.sigma)) * fg_mask.float() #(BS, N, 1)
 
-        loss_point = (pred_offset - gt_offset).pow(2).sum(dim=2, keepdim=True).sqrt() #(BS, N, 1)
-        gt_hmap = torch.exp(-1 * loss_point.detach().pow(2) / (2 * self.sigma * self.sigma)) * fg_mask.float() #(BS, N, 1)
+            loss_offset = (loss_point * pc_offset_weight).sum()
+            loss_center = self.center_loss(pred_hmap[valid_mask], gt_hmap[valid_mask])
 
-        loss_offset = (loss_point * pc_offset_weight).sum()
-        loss_center = self.center_loss(pred_hmap[valid_mask], gt_hmap[valid_mask])
-
-        loss_total = self.ce_weight * loss_ce + self.lovasz_weight * loss_lovasz + self.center_weight * loss_center + self.offset_weight * loss_offset
+            loss_total = self.ce_weight * loss_ce + self.lovasz_weight * loss_lovasz + self.center_weight * loss_center + self.offset_weight * loss_offset
+        else:
+            loss_total = self.ce_weight * loss_ce + self.lovasz_weight * loss_lovasz
         return loss_total

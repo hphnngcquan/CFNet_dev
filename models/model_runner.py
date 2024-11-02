@@ -128,8 +128,13 @@ class ModelRunnerSemKITTI(trainer.ADDistTrainer):
         loss_dic = collections.OrderedDict()
         loss = 0
         for i in range(len(pred_list)):
-            loss_pano = self.panoptic_loss(pred_list[i][0], pred_list[i][1], pred_list[i][2], pcds_offset, pcds_ins_label, pcds_sem_label)
-            loss_pano_raw = self.panoptic_loss(pred_list_raw[i][0], pred_list_raw[i][1], pred_list_raw[i][2], pcds_offset_raw, pcds_ins_label, pcds_sem_label)
+            if len(pred_list[i]) <= 1:
+                loss_pano = self.panoptic_loss(pred_list[i][0], None, None, pcds_offset, pcds_ins_label, pcds_sem_label)
+                loss_pano_raw = self.panoptic_loss(pred_list_raw[i][0], None, None, pcds_offset_raw, pcds_ins_label, pcds_sem_label)
+            else:
+                  
+                loss_pano = self.panoptic_loss(pred_list[i][0], pred_list[i][1], pred_list[i][2], pcds_offset, pcds_ins_label, pcds_sem_label)
+                loss_pano_raw = self.panoptic_loss(pred_list_raw[i][0], pred_list_raw[i][1], pred_list_raw[i][2], pcds_offset_raw, pcds_ins_label, pcds_sem_label)
 
             loss_consist = self.consistency_loss_l1(pred_list[i][0], pred_list_raw[i][0])
 
@@ -152,19 +157,19 @@ class ModelRunnerSemKITTI(trainer.ADDistTrainer):
                                shifted_pcds=shifted_pcds.squeeze(0), mapping_mat=mapping_mat)
 
         pred_panoptic_list = []
-        for (pred_sem, pred_offset, pred_hmap) in pred_list:
-            pred_sem = pred_sem[:, :, :mapping_mat['n_0'][0]]
-            pred_offset = pred_offset[:, :mapping_mat['n_0'][0]]
-            pred_hmap = pred_hmap[:, :mapping_mat['n_0'][0]]
-            pred_sem = F.softmax(pred_sem, dim=1).mean(dim=0).permute(2, 1, 0).contiguous()[0]
-            pred_offset = merge_offset_tta(pred_offset)
-            pred_hmap = pred_hmap.mean(dim=0).squeeze(1)
+        for pred_sem, pred_offset, pred_hmap in [pred_list[1]]:
+                pred_sem = pred_sem[:, :, :mapping_mat['n_0'][0]]
+                pred_offset = pred_offset[:, :mapping_mat['n_0'][0]]
+                pred_hmap = pred_hmap[:, :mapping_mat['n_0'][0]]
+                pred_sem = F.softmax(pred_sem, dim=1).mean(dim=0).permute(2, 1, 0).contiguous()[0]
+                pred_offset = merge_offset_tta(pred_offset)
+                pred_hmap = pred_hmap.mean(dim=0).squeeze(1)
 
-            # make result
-            pred_obj_center, pred_panoptic = self.pv_nms(pcds_xyzi[0, 0, :3, :mapping_mat['n_0'][0], 0].T.contiguous(), pred_sem, pred_offset, pred_hmap)
-            pred_panoptic = pred_panoptic.cpu().numpy().astype(np.uint32)
+                # make result
+                pred_obj_center, pred_panoptic = self.pv_nms(pcds_xyzi[0, 0, :3, :mapping_mat['n_0'][0], 0].T.contiguous(), pred_sem, pred_offset, pred_hmap)
+                pred_panoptic = pred_panoptic.cpu().numpy().astype(np.uint32)
 
-            pred_panoptic_list.append(pred_panoptic)
+                pred_panoptic_list.append(pred_panoptic)
         
         pred_panoptic_list = np.stack(pred_panoptic_list, axis=0)
         self.pred_data_list.append((os.path.basename(fn[0]).replace('.bin', '.npz'), pano_label, pred_panoptic_list))

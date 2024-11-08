@@ -74,12 +74,12 @@ class CFNet_Shifted(nn.Module):
             self.pred_layer_sem = backbone.PredBranch(self.point_feat_out_channels, self.pModel.class_num)
 
             # ins branch
-            # self.point_fusion_ins = get_module(fusion_cfg, in_channel_list=point_fusion_channels, out_channel=self.point_feat_out_channels)
-            # self.pred_layer_offset = backbone.PredBranch(self.point_feat_out_channels, 3)
-            # self.pred_layer_hmap = nn.Sequential(
-            #     backbone.PredBranch(self.point_feat_out_channels, 1),
-            #     nn.Sigmoid()
-            # )
+            self.point_fusion_ins = get_module(fusion_cfg, in_channel_list=point_fusion_channels, out_channel=self.point_feat_out_channels)
+            self.pred_layer_offset = backbone.PredBranch(self.point_feat_out_channels, 3)
+            self.pred_layer_hmap = nn.Sequential(
+                backbone.PredBranch(self.point_feat_out_channels, 1),
+                nn.Sigmoid()
+            )
 
         # CFFE
         if hasattr(self.pModel, "CFFEParam") and self.pModel.cffe_used:
@@ -154,15 +154,15 @@ class CFNet_Shifted(nn.Module):
         
 
         if self.pModel.auxiliary:
-            # point_bev_ins = self.bev2point(bev_feat_ins * attn_map_bev, pcds_coord_wl)
-            # point_rv_ins = self.rv2point(rv_feat_ins * attn_map_rv, pcds_sphere_coord)
+            point_bev_ins = self.bev2point(bev_feat_ins * attn_map_bev, pcds_coord_wl)
+            point_rv_ins = self.rv2point(rv_feat_ins * attn_map_rv, pcds_sphere_coord)
             pred_sem = self.pred_layer_sem(point_feat_sem).float()
 
             # ins branch
-            # point_feat_ins = self.point_fusion_ins(point_feat_tmp, point_bev_ins, point_rv_ins) #TODO try point_feat_tmp_0 if point_feat_tmp is not good enough
-            # pred_offset = self.pred_layer_offset(point_feat_ins).float().squeeze(-1).transpose(1, 2).contiguous()
-            # pred_hmap = self.pred_layer_hmap(point_feat_ins).float().squeeze(1)
-            preds_list = [[pred_sem]]
+            point_feat_ins = self.point_fusion_ins(point_feat_tmp, point_bev_ins, point_rv_ins) #TODO try point_feat_tmp_0 if point_feat_tmp is not good enough
+            pred_offset = self.pred_layer_offset(point_feat_ins).float().squeeze(-1).transpose(1, 2).contiguous()
+            pred_hmap = self.pred_layer_hmap(point_feat_ins).float().squeeze(1)
+            preds_list = [(pred_sem, pred_offset, pred_hmap)]
 
         if hasattr(self.pModel, "CFFEParam") and self.pModel.cffe_used:
             # mapping

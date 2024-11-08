@@ -108,7 +108,7 @@ def main(args, config):
         print('Load pretrain model: {}'.format(args.pretrain_model))
         model.load_state_dict(torch.load(args.pretrain_model, map_location='cpu')['model_dic'], strict=False)
     
-    model_trainer.fit(model, train_dataloader=train_loader, val_dataloader=val_loader, ckpt_path=args.resume_ckpt, find_unused_parameters=False)
+    model_trainer.fit(model, train_dataloader=train_loader, val_dataloader=None, ckpt_path=args.resume_ckpt, find_unused_parameters=False)
 
 
 if __name__ == '__main__':

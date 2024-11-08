@@ -9,7 +9,7 @@ from .networks.fusion_module import SpatialAttention_mtf
 from . import common_utils
 from datasets.utils import save_feature_map
 from utils.config_parser import get_module
-
+import time
 import pdb
 
 if False:
@@ -177,6 +177,7 @@ if False:
 class CFNet_Shifted(nn.Module):
     def __init__(self, pModel):
         super(CFNet_Shifted, self).__init__()
+        self.total_time = 0
         self.pModel = pModel
 
         self.bev_shape = list(self.pModel.Voxel.bev_shape)
@@ -203,32 +204,14 @@ class CFNet_Shifted(nn.Module):
 
         fusion_cfg = self.pModel.FusionParam
         
-        tm_emb_dim = self.pModel.time_embedding_dim
         attn_map = self.pModel.attn_map
         T = self.pModel.n_past_pcls + 1
         
-        if tm_emb_dim:
-
-            self.time_embedding = nn.ParameterList(
-                    [nn.Parameter(torch.randn(1, tm_emb_dim, 1, 1)) for _ in range(T)]
-                )
-
-
-            self.point_pre_sub = nn.Sequential(
-                backbone.conv1x1(7, tm_emb_dim),
-            )
-            
-            # base network
-            self.point_pre = nn.Sequential(
-                backbone.bn_conv1x1_bn_relu(tm_emb_dim, bev_base_channels[0]),
-                backbone.conv1x1_bn_relu(bev_base_channels[0], bev_base_channels[0])
-            )
-        else:
-            # base network
-            self.point_pre = nn.Sequential(
-                backbone.bn_conv1x1_bn_relu(7, bev_base_channels[0]),
-                backbone.conv1x1_bn_relu(bev_base_channels[0], bev_base_channels[0])
-            )
+        # base network
+        self.point_pre = nn.Sequential(
+            backbone.bn_conv1x1_bn_relu(7, bev_base_channels[0]),
+            backbone.conv1x1_bn_relu(bev_base_channels[0], bev_base_channels[0])
+        )
         if attn_map:
             attn_cfg = self.pModel.AttnParam
             self.point2bev_attn = get_module(attn_cfg.BEVParam.P2VParam)
@@ -298,28 +281,12 @@ class CFNet_Shifted(nn.Module):
             pred_offset (BS, N, 3)
             pred_hmap (BS, N, 1)
         '''
+        # start = time.perf_counter()
         pcds_coord_wl = pcds_coord[:, :, :2].contiguous()
         pcds_coord_wl_0 = pcds_coord[:, :mapping_mat['n_0'][0], :2].contiguous()
         
-        if hasattr(self, 'time_embedding'):
-            fuse_emb_mark = torch.cat([torch.ones(map_val, device=pcds_xyzi.device) * mapping_i 
-                                        for mapping_i, (_, map_val) in enumerate(mapping_mat.items())], dim=0).long()
 
-            # Precompute time embedding expansions for all time steps
-            fuse_ebd_feat_expanded = [fuse_ebd_feat.expand(pcds_xyzi.size(0), -1, -1, -1) for fuse_ebd_feat in self.time_embedding]
-
-            pcds_xyzi_sub = self.point_pre_sub(pcds_xyzi) # from B,7,N,1 to B,18,N,1
-
-            for tm, fuse_ebd_feat_exp in enumerate(fuse_ebd_feat_expanded):
-                # Create a mask for this time embedding
-                mask = (fuse_emb_mark == tm).unsqueeze(0).unsqueeze(1).unsqueeze(-1)  # Shape: (1, 1, N, 1)
-
-                # Update only the points that correspond to this time step
-                pcds_xyzi_sub = pcds_xyzi_sub + fuse_ebd_feat_exp * mask
-            
-            point_feat_tmp = self.point_pre(pcds_xyzi_sub) #c = 64
-        else:
-            point_feat_tmp = self.point_pre(pcds_xyzi)
+        point_feat_tmp = self.point_pre(pcds_xyzi)
 
         if hasattr(self, 'attn_bev'):
             assert pcds_coord_wl_0.shape[1] == pcds_sphere_coord[:, :mapping_mat['n_0'][0], :, :].shape[1] == mapping_mat['n_0'][0]
@@ -345,8 +312,6 @@ class CFNet_Shifted(nn.Module):
         
 
         # stage0
-        # sem branch
-        # TODO multiply attentiuon map here
         point_feat_sem = self.point_fusion_sem(point_feat_tmp, point_bev_sem, point_rv_sem) #TODO try point_feat_tmp_0 if point_feat_tmp is not good enough
         
 
@@ -397,5 +362,7 @@ class CFNet_Shifted(nn.Module):
                 preds_list.append((pred_sem_cffe, pred_offset_cffe, pred_hmap_cffe))
             else:
                 preds_list = [(pred_sem_cffe, pred_offset_cffe, pred_hmap_cffe)]
-        
+        # end = time.perf_counter()
+        # self.total_time += end - start
+        # print('total time:', self.total_time)
         return preds_list

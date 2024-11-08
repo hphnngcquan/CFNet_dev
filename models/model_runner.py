@@ -294,7 +294,7 @@ class ModelRunnerSemKITTI(trainer.ADDistTrainer):
                 metric_pano = criterion_pano_list[i].get_metric()
                 for key in metric_pano:
                     record_dic["{}_{}".format(key, i)] = metric_pano[key]
-            record_dic["offset_loss"] = (sum(offset_loss) / len(offset_loss)).item()
+            # record_dic["offset_loss"] = (sum(offset_loss) / len(offset_loss)).item()
             # record_dic["offset_loss_raw"] = (sum(offset_loss_raw) / len(offset_loss_raw)).item()            
             with open(os.path.join(self.test_save_path, "metric.yaml"), "w") as f:
                 yaml.dump(record_dic, f)

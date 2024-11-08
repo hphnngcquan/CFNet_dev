@@ -166,7 +166,7 @@ class CFNet_Shifted(nn.Module):
 
         if hasattr(self.pModel, "CFFEParam") and self.pModel.cffe_used:
             # mapping
-            point_feat_sem_1 = point_feat_sem[:, :, -mapping_mat['n_1'][0]:,].clone() #TODO think about the mapping index
+            point_feat_sem_1 = point_feat_sem[:, :, -mapping_mat['n_1'][0]:,].clone() 
 
             
             # reprojection

@@ -33,7 +33,7 @@ def merge_offset_tta(pred_offset):
         pred_offset_result, (N, 3)
     '''
     assert pred_offset.ndim == 3
-    assert (pred_offset.shape[0] == 4) or (pred_offset.shape[0] == 1)
+    assert (pred_offset.shape[0] == 4) or (pred_offset.shape[0] == 1)  or (pred_offset.shape[0] == 2)
     assert pred_offset.shape[2] == 3
     if pred_offset.shape[0] == 4:
         p = 0
@@ -230,17 +230,15 @@ class ModelRunnerSemKITTI(trainer.ADDistTrainer):
 
         pred_panoptic_list = []
         
-        for i, (pred_sem, pred_offset, pred_hmap) in enumerate(pred_list):
+        for pred_sem, pred_offset, pred_hmap in [pred_list[1]]:
             pred_sem = pred_sem[:, :, :mapping_mat['n_0'][0]]
             pred_offset = pred_offset[:, :mapping_mat['n_0'][0]]
             pred_hmap = pred_hmap[:, :mapping_mat['n_0'][0]]
             # calculate offset loss
             loss_point = (pred_offset - pcds_offset[0][:, :mapping_mat['n_0'][0]]).pow(2).sum(dim=2, keepdim=True).sqrt() #(BS, N, 1)
             loss_offset = (loss_point).mean()
-            if i == 0:
-                offset_loss.append(loss_offset)
-            if i == 1:
-                offset_loss_raw.append(loss_offset)
+            
+            offset_loss_raw.append(loss_offset)
             
             pred_sem = F.softmax(pred_sem, dim=1).mean(dim=0).permute(2, 1, 0).contiguous()[0]
             pred_offset = merge_offset_tta(pred_offset)
@@ -291,15 +289,15 @@ class ModelRunnerSemKITTI(trainer.ADDistTrainer):
                 metric_pano = criterion_pano_list[i].get_metric()
                 for key in metric_pano:
                     record_dic["{}_{}".format(key, i)] = metric_pano[key]
-            record_dic["offset_loss"] = (sum(offset_loss) / len(offset_loss)).item()
+            # record_dic["offset_loss"] = (sum(offset_loss) / len(offset_loss)).item()
             # record_dic["offset_loss_raw"] = (sum(offset_loss_raw) / len(offset_loss_raw)).item()            
             with open(os.path.join(self.test_save_path, "metric.yaml"), "w") as f:
                 yaml.dump(record_dic, f)
                 
     @torch.no_grad()
     def predict_step(self, batch_idx, batch):
-        generate_offset = False
-        test = False
+        # generate_offset = False
+        test = True
         if test:
             pcds_xyzi, pcds_coord, pcds_sphere_coord, shifted_pcds, mapping_mat, seq_id, fn = batch
         else:
@@ -309,7 +307,7 @@ class ModelRunnerSemKITTI(trainer.ADDistTrainer):
                                shifted_pcds=shifted_pcds.squeeze(0), mapping_mat=mapping_mat)
 
         pred_panoptic_list = []
-        for i, (pred_sem, pred_offset, pred_hmap) in enumerate(pred_list):
+        for pred_sem, pred_offset, pred_hmap in [pred_list[1]]:
             pred_sem = pred_sem[:, :, :mapping_mat['n_0'][0]]
             pred_offset = pred_offset[:, :mapping_mat['n_0'][0]]
             pred_hmap = pred_hmap[:, :mapping_mat['n_0'][0]]
@@ -320,10 +318,10 @@ class ModelRunnerSemKITTI(trainer.ADDistTrainer):
 
             # make result
             pred_obj_center, pred_panoptic = self.pv_nms(pcds_xyzi[0, 0, :3, :mapping_mat['n_0'][0], 0].T.contiguous(), pred_sem, pred_offset, pred_hmap)
-            if i == 0 and  generate_offset:
-                assert pred_offset.shape[0] == pcds_xyzi.shape[3]
-                pred_offset_save = pred_offset * (pred_hmap.unsqueeze(1) > self.pModel.score_thresh).float()
-                gen_offsetkitti(pred_offset_save, seq_id[0], fn)
+            # if i == 0 and  generate_offset:
+            #     assert pred_offset.shape[0] == pcds_xyzi.shape[3]
+            #     pred_offset_save = pred_offset * (pred_hmap.unsqueeze(1) > self.pModel.score_thresh).float()
+            #     gen_offsetkitti(pred_offset_save, seq_id[0], fn)
             pred_panoptic = pred_panoptic.cpu().numpy().astype(np.uint32)
             
             pred_panoptic_list.append(pred_panoptic)

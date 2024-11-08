@@ -5,10 +5,11 @@ import torch.nn.functional as F
 import numpy as np
 
 from .networks import backbone
+from .networks.fusion_module import SpatialAttention_mtf
 from . import common_utils
-
+from datasets.utils import save_feature_map
 from utils.config_parser import get_module
-
+import time
 import pdb
 
 if False:
@@ -176,6 +177,7 @@ if False:
 class CFNet_Shifted(nn.Module):
     def __init__(self, pModel):
         super(CFNet_Shifted, self).__init__()
+        self.total_time = 0
         self.pModel = pModel
 
         self.bev_shape = list(self.pModel.Voxel.bev_shape)
@@ -202,28 +204,20 @@ class CFNet_Shifted(nn.Module):
 
         fusion_cfg = self.pModel.FusionParam
         
-        tm_emb_dim = self.pModel.time_embedding_dim
+        attn_map = self.pModel.attn_map
         T = self.pModel.n_past_pcls + 1
         
-        if tm_emb_dim:
-
-            self.time_embedding = nn.ParameterList(
-                    [nn.Parameter(torch.randn(1, tm_emb_dim, 1, 1)) for _ in range(T)]
-                )
-
-            
-            # base network
-            self.point_pre = nn.Sequential(
-                backbone.bn_conv1x1_bn_relu(7, bev_base_channels[0]),
-                backbone.conv1x1_bn_relu(bev_base_channels[0], bev_base_channels[0])
-            )
-        else:
-            # base network
-            self.point_pre = nn.Sequential(
-                backbone.bn_conv1x1_bn_relu(7, bev_base_channels[0]),
-                backbone.conv1x1_bn_relu(bev_base_channels[0], bev_base_channels[0])
-            )
-
+        # base network
+        self.point_pre = nn.Sequential(
+            backbone.bn_conv1x1_bn_relu(7, bev_base_channels[0]),
+            backbone.conv1x1_bn_relu(bev_base_channels[0], bev_base_channels[0])
+        )
+        if attn_map:
+            attn_cfg = self.pModel.AttnParam
+            self.point2bev_attn = get_module(attn_cfg.BEVParam.P2VParam)
+            self.point2rv_attn = get_module(attn_cfg.RVParam.P2VParam)
+            self.attn_bev = SpatialAttention_mtf()
+            self.attn_rv = SpatialAttention_mtf()
         # BEV network
         self.point2bev = get_module(bev_net_cfg.P2VParam)
         self.bev_net = get_module(bev_net_cfg)
@@ -238,15 +232,16 @@ class CFNet_Shifted(nn.Module):
         # sem branch
         point_fusion_channels = (bev_base_channels[0], self.bev_net.out_channels, self.rv_net.out_channels)
         self.point_fusion_sem = get_module(fusion_cfg, in_channel_list=point_fusion_channels, out_channel=self.point_feat_out_channels)
-        self.pred_layer_sem = backbone.PredBranch(self.point_feat_out_channels, self.pModel.class_num)
+        if self.pModel.auxiliary:
+            self.pred_layer_sem = backbone.PredBranch(self.point_feat_out_channels, self.pModel.class_num)
 
-        # ins branch
-        self.point_fusion_ins = get_module(fusion_cfg, in_channel_list=point_fusion_channels, out_channel=self.point_feat_out_channels)
-        self.pred_layer_offset = backbone.PredBranch(self.point_feat_out_channels, 3)
-        self.pred_layer_hmap = nn.Sequential(
-            backbone.PredBranch(self.point_feat_out_channels, 1),
-            nn.Sigmoid()
-        )
+            # ins branch
+            # self.point_fusion_ins = get_module(fusion_cfg, in_channel_list=point_fusion_channels, out_channel=self.point_feat_out_channels)
+            # self.pred_layer_offset = backbone.PredBranch(self.point_feat_out_channels, 3)
+            # self.pred_layer_hmap = nn.Sequential(
+            #     backbone.PredBranch(self.point_feat_out_channels, 1),
+            #     nn.Sigmoid()
+            # )
 
         # CFFE
         if hasattr(self.pModel, "CFFEParam") and self.pModel.cffe_used:
@@ -286,54 +281,50 @@ class CFNet_Shifted(nn.Module):
             pred_offset (BS, N, 3)
             pred_hmap (BS, N, 1)
         '''
+        # start = time.perf_counter()
         pcds_coord_wl = pcds_coord[:, :, :2].contiguous()
+        pcds_coord_wl_0 = pcds_coord[:, :mapping_mat['n_0'][0], :2].contiguous()
         
-        if hasattr(self, 'time_embedding'):
-            fuse_emb_mark = torch.cat([torch.ones(map_val, device=pcds_xyzi.device) * mapping_i 
-                                        for mapping_i, (_, map_val) in enumerate(mapping_mat.items())], dim=0).long()
 
-            # Precompute time embedding expansions for all time steps
-            fuse_ebd_feat_expanded = [fuse_ebd_feat.expand(pcds_xyzi.size(0), -1, -1, -1) for fuse_ebd_feat in self.time_embedding]
+        point_feat_tmp = self.point_pre(pcds_xyzi)
 
-            point_feat_tmp = self.point_pre(pcds_xyzi) # from B,7,N,1 to B,18,N,1
-
-            for tm, fuse_ebd_feat_exp in enumerate(fuse_ebd_feat_expanded):
-                # Create a mask for this time embedding
-                mask = (fuse_emb_mark == tm).unsqueeze(0).unsqueeze(1).unsqueeze(-1)  # Shape: (1, 1, N, 1)
-
-                # Update only the points that correspond to this time step
-                point_feat_tmp = point_feat_tmp + fuse_ebd_feat_exp * mask
-            
-            # point_feat_tmp = self.point_pre(pcds_xyzi_sub) #c = 64
-        else:
-            point_feat_tmp = self.point_pre(pcds_xyzi)
-
+        if hasattr(self, 'attn_bev'):
+            assert pcds_coord_wl_0.shape[1] == pcds_sphere_coord[:, :mapping_mat['n_0'][0], :, :].shape[1] == mapping_mat['n_0'][0]
+            # mapping point_feat_tmp
+            point_feat_temp_0 = point_feat_tmp[:,:,:mapping_mat['n_0'][0],:].clone()
+            bev_input_0 = self.point2bev_attn(point_feat_temp_0, pcds_coord_wl_0) 
+            attn_map_bev = self.attn_bev(bev_input_0) # B,1,300,300
+            rv_input_0 = self.point2rv_attn(point_feat_temp_0, pcds_sphere_coord[:, :mapping_mat['n_0'][0], :, :].contiguous())
+            attn_map_rv = self.attn_rv(rv_input_0) # B,1,64,1024
+        
         # BEV network
         bev_input = self.point2bev(point_feat_tmp, pcds_coord_wl)
         bev_feat_sem, bev_feat_ins = self.bev_net(bev_input)
 
-        point_bev_sem = self.bev2point(bev_feat_sem, pcds_coord_wl)
-        point_bev_ins = self.bev2point(bev_feat_ins, pcds_coord_wl)
+        point_bev_sem = self.bev2point(bev_feat_sem * attn_map_bev, pcds_coord_wl)
+        
 
         # RV network
         rv_input = self.point2rv(point_feat_tmp, pcds_sphere_coord)
         rv_feat_sem, rv_feat_ins = self.rv_net(rv_input)
 
-        point_rv_sem = self.rv2point(rv_feat_sem, pcds_sphere_coord)
-        point_rv_ins = self.rv2point(rv_feat_ins, pcds_sphere_coord)
+        point_rv_sem = self.rv2point(rv_feat_sem * attn_map_rv, pcds_sphere_coord)
+        
 
         # stage0
-        # sem branch
-        point_feat_sem = self.point_fusion_sem(point_feat_tmp, point_bev_sem, point_rv_sem)
-        pred_sem = self.pred_layer_sem(point_feat_sem).float()
-
-        # ins branch
-        point_feat_ins = self.point_fusion_ins(point_feat_tmp, point_bev_ins, point_rv_ins)
-        pred_offset = self.pred_layer_offset(point_feat_ins).float().squeeze(-1).transpose(1, 2).contiguous()
-        pred_hmap = self.pred_layer_hmap(point_feat_ins).float().squeeze(1)
+        point_feat_sem = self.point_fusion_sem(point_feat_tmp, point_bev_sem, point_rv_sem) #TODO try point_feat_tmp_0 if point_feat_tmp is not good enough
+        
 
         if self.pModel.auxiliary:
-            preds_list = [(pred_sem, pred_offset, pred_hmap)]
+            # point_bev_ins = self.bev2point(bev_feat_ins * attn_map_bev, pcds_coord_wl)
+            # point_rv_ins = self.rv2point(rv_feat_ins * attn_map_rv, pcds_sphere_coord)
+            pred_sem = self.pred_layer_sem(point_feat_sem).float()
+
+            # ins branch
+            # point_feat_ins = self.point_fusion_ins(point_feat_tmp, point_bev_ins, point_rv_ins) #TODO try point_feat_tmp_0 if point_feat_tmp is not good enough
+            # pred_offset = self.pred_layer_offset(point_feat_ins).float().squeeze(-1).transpose(1, 2).contiguous()
+            # pred_hmap = self.pred_layer_hmap(point_feat_ins).float().squeeze(1)
+            preds_list = [[pred_sem]]
 
         if hasattr(self.pModel, "CFFEParam") and self.pModel.cffe_used:
             # mapping
@@ -346,14 +337,14 @@ class CFNet_Shifted(nn.Module):
             
             # BEV network
             bev_cfg_feat_1 = self.point2bev_cffe(point_feat_sem_1, pcds_coord_wl_reproj_1)
-            bev_feat_sem_final, bev_feat_ins_final = self.bev_cffe(bev_feat_sem, bev_cfg_feat_1)
+            bev_feat_sem_final, bev_feat_ins_final = self.bev_cffe(bev_feat_sem * attn_map_bev, bev_cfg_feat_1)
 
             point_bev_sem_cffe = self.bev2point_cffe(bev_feat_sem_final, pcds_coord_wl)
             point_bev_ins_cffe = self.bev2point_cffe(bev_feat_ins_final, pcds_coord_wl)
 
             # RV network
             rv_cfg_feat_1 = self.point2rv_cffe(point_feat_sem_1, pcds_sphere_coord_reproj_1)
-            rv_feat_sem_final, rv_feat_ins_final = self.rv_cffe(rv_feat_sem, rv_cfg_feat_1)
+            rv_feat_sem_final, rv_feat_ins_final = self.rv_cffe(rv_feat_sem * attn_map_rv, rv_cfg_feat_1)
 
             point_rv_sem_cffe = self.rv2point_cffe(rv_feat_sem_final, pcds_sphere_coord)
             point_rv_ins_cffe = self.rv2point_cffe(rv_feat_ins_final, pcds_sphere_coord)
@@ -371,5 +362,7 @@ class CFNet_Shifted(nn.Module):
                 preds_list.append((pred_sem_cffe, pred_offset_cffe, pred_hmap_cffe))
             else:
                 preds_list = [(pred_sem_cffe, pred_offset_cffe, pred_hmap_cffe)]
-        
+        # end = time.perf_counter()
+        # self.total_time += end - start
+        # print('total time:', self.total_time)
         return preds_list

@@ -6,7 +6,22 @@ from . import backbone
 
 import pdb
 
+class SpatialAttention_mtf(nn.Module):
+    def __init__(self, kernel_size=7):
+        super(SpatialAttention_mtf, self).__init__()
+        
+        # TODO consider change to backbone.conv1x1_bn(2, 1)
+        self.conv1 = nn.Conv2d(2, 1, kernel_size, padding=kernel_size // 2, bias=False)
+        self.sigmoid = nn.Sigmoid()
 
+    def forward(self, curr, prev=None):
+        #  curr = (B,C,H,W)
+        avg_out = torch.mean(curr, dim=1, keepdim=True) # (B,1,H,W)
+        max_out, _ = torch.max(curr, dim=1, keepdim=True) # (B,1,H,W)
+        y = torch.cat([avg_out, max_out], dim=1) # (B,2,H,W)
+        y = self.conv1(y) # (B,1,H,W)
+        return self.sigmoid(y)
+    
 class PointCatFusion(nn.Module):
     def __init__(self, in_channel_list, out_channel):
         super(PointCatFusion, self).__init__()

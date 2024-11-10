@@ -56,8 +56,6 @@ class CFNet_Shifted(nn.Module):
             self.point2rv_attn = get_module(attn_cfg.RVParam.P2VParam)
             self.attn_bev = SpatialAttention_mtf()
             self.attn_rv = SpatialAttention_mtf()
-            self.attn_bev_ins = SpatialAttention_mtf()
-            self.attn_rv_ins = SpatialAttention_mtf()
             self.fuse_bev_conv = nn.Sequential(
                 backbone.bn_conv3x3_bn_relu(bev_base_channels[2] * 2, bev_base_channels[2]),               
             )
@@ -65,12 +63,6 @@ class CFNet_Shifted(nn.Module):
                 backbone.bn_conv3x3_bn_relu(bev_base_channels[2] * 2, bev_base_channels[2]),               
             )
             
-            self.fuse_bev_conv_ins = nn.Sequential(
-                backbone.bn_conv3x3_bn_relu(bev_base_channels[2] * 2, bev_base_channels[2]),               
-            )
-            self.fuse_rv_conv_ins = nn.Sequential(
-                backbone.bn_conv3x3_bn_relu(bev_base_channels[2] * 2, bev_base_channels[2]),               
-            )
         # BEV network
         self.point2bev = get_module(bev_net_cfg.P2VParam)
         self.bev_net = get_module(bev_net_cfg)
@@ -181,19 +173,7 @@ class CFNet_Shifted(nn.Module):
         
 
         if self.pModel.auxiliary:
-            if hasattr(self, 'attn_bev'):
-                prev_bev_ins, curr_bev_ins = torch.split(bev_feat_ins, bev_feat_ins.shape[0] // 2)
-                bev_fused_ins = self.attn_bev_ins(curr_bev_ins, prev_bev_ins)
-                bev_feat_ins = torch.cat([curr_bev_ins, bev_fused_ins], dim=1)
-                bev_feat_ins = self.fuse_bev_conv_ins(bev_feat_ins)
             point_bev_ins = self.bev2point(bev_feat_ins, pcds_coord_wl_0)
-            
-            if hasattr(self, 'attn_bev'):
-                prev_rv_ins, curr_rv_ins = torch.split(rv_feat_ins, rv_feat_ins.shape[0] // 2)
-                bev_fused_ins = self.attn_rv_ins(curr_rv_ins, prev_rv_ins)
-                bev_feat_ins = torch.cat([curr_rv_ins, bev_fused_ins], dim=1)
-                bev_feat_ins = self.fuse_rv_conv_ins(bev_feat_ins)
-                
             point_rv_ins = self.rv2point(bev_feat_ins, pcds_sphere_coord[:, :mapping_mat['n_0'][0], :, :].contiguous())
             pred_sem = self.pred_layer_sem(point_feat_sem).float()
 

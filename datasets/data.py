@@ -522,28 +522,28 @@ class DataloadVal(Dataset):
         pcds_ins_label_list = []
         pcds_offset_list = []
         shifted_pcds_list = []
-        for x_sign in [1, -1]:
-            for y_sign in [1, -1]:
-                pcds_tmp = pcds_for_aug.copy()
-                pcds_tmp[:, 0] *= x_sign
-                pcds_tmp[:, 1] *= y_sign
-                
-                # shifted
-                shifted_pcds = torch.FloatTensor(pcds_tmp[-mapping_mat['n_1']:][:, :3].astype(np.float32)).transpose(1, 0).contiguous().unsqueeze(-1)
-                
-                if self.align and (int(fn[:-4]) > 0):
-                    pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset = self.form_batch(pcds_tmp[:-mapping_mat['n_1']])
-                else:
-                    pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset = self.form_batch(pcds_tmp[:mapping_mat['n_0']])
-                    shifted_pcds = torch.zeros_like(shifted_pcds)
+        # for x_sign in [1, -1]:
+        #     for y_sign in [1, -1]:
+        #         pcds_tmp = pcds_for_aug.copy()
+        #         pcds_tmp[:, 0] *= x_sign
+        #         pcds_tmp[:, 1] *= y_sign
+        pcds_tmp = pcds_for_aug.copy()
+        # shifted
+        shifted_pcds = torch.FloatTensor(pcds_tmp[-mapping_mat['n_1']:][:, :3].astype(np.float32)).transpose(1, 0).contiguous().unsqueeze(-1)
+        
+        if self.align and (int(fn[:-4]) > 0):
+            pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset = self.form_batch(pcds_tmp[:-mapping_mat['n_1']])
+        else:
+            pcds_xyzi, pcds_coord, pcds_sphere_coord, pcds_sem_label, pcds_ins_label, pcds_offset = self.form_batch(pcds_tmp[:mapping_mat['n_0']])
+            shifted_pcds = torch.zeros_like(shifted_pcds)
 
-                pcds_xyzi_list.append(pcds_xyzi)
-                pcds_coord_list.append(pcds_coord)
-                pcds_sphere_coord_list.append(pcds_sphere_coord)
-                pcds_sem_label_list.append(pcds_sem_label)
-                pcds_ins_label_list.append(pcds_ins_label)
-                pcds_offset_list.append(pcds_offset)
-                shifted_pcds_list.append(shifted_pcds)
+        pcds_xyzi_list.append(pcds_xyzi)
+        pcds_coord_list.append(pcds_coord)
+        pcds_sphere_coord_list.append(pcds_sphere_coord)
+        pcds_sem_label_list.append(pcds_sem_label)
+        pcds_ins_label_list.append(pcds_ins_label)
+        pcds_offset_list.append(pcds_offset)
+        shifted_pcds_list.append(shifted_pcds)
                 
         if self.align and (int(fn[:-4]) <= 0):
             mapping_mat['n_1'] = 0

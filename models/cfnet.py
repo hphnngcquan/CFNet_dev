@@ -56,6 +56,21 @@ class CFNet_Shifted(nn.Module):
             self.point2rv_attn = get_module(attn_cfg.RVParam.P2VParam)
             self.attn_bev = SpatialAttention_mtf()
             self.attn_rv = SpatialAttention_mtf()
+            self.attn_bev_ins = SpatialAttention_mtf()
+            self.attn_rv_ins = SpatialAttention_mtf()
+            self.fuse_bev_conv = nn.Sequential(
+                backbone.bn_conv3x3_bn_relu(bev_base_channels[2] * 2, bev_base_channels[2]),               
+            )
+            self.fuse_rv_conv = nn.Sequential(
+                backbone.bn_conv3x3_bn_relu(bev_base_channels[2] * 2, bev_base_channels[2]),               
+            )
+            
+            self.fuse_bev_conv_ins = nn.Sequential(
+                backbone.bn_conv3x3_bn_relu(bev_base_channels[2] * 2, bev_base_channels[2]),               
+            )
+            self.fuse_rv_conv_ins = nn.Sequential(
+                backbone.bn_conv3x3_bn_relu(bev_base_channels[2] * 2, bev_base_channels[2]),               
+            )
         # BEV network
         self.point2bev = get_module(bev_net_cfg.P2VParam)
         self.bev_net = get_module(bev_net_cfg)
@@ -131,35 +146,59 @@ class CFNet_Shifted(nn.Module):
             # mapping point_feat_tmp
             point_feat_temp_0 = point_feat_tmp[:,:,:mapping_mat['n_0'][0],:].clone()
             bev_input_0 = self.point2bev_attn(point_feat_temp_0, pcds_coord_wl_0) 
-            attn_map_bev = self.attn_bev(bev_input_0) # B,1,300,300
             rv_input_0 = self.point2rv_attn(point_feat_temp_0, pcds_sphere_coord[:, :mapping_mat['n_0'][0], :, :].contiguous())
-            attn_map_rv = self.attn_rv(rv_input_0) # B,1,64,1024
         
         # BEV network
         bev_input = self.point2bev(point_feat_tmp, pcds_coord_wl)
+        bev_input = torch.cat([bev_input, bev_input_0], dim=0)
         bev_feat_sem, bev_feat_ins = self.bev_net(bev_input)
+        
+        if hasattr(self, 'attn_bev'):
+            prev, curr = torch.split(bev_feat_sem, 2)
+            bev_fused = self.attn_bev(curr, prev)
+            bev_feat_sem = torch.cat([curr, bev_fused], dim=1)
+            bev_feat_sem = self.fuse_bev_conv(bev_feat_sem)
 
-        point_bev_sem = self.bev2point(bev_feat_sem * attn_map_bev, pcds_coord_wl)
+        point_bev_sem = self.bev2point(bev_feat_sem, pcds_coord_wl_0)
         
 
         # RV network
         rv_input = self.point2rv(point_feat_tmp, pcds_sphere_coord)
+        rv_input = torch.cat([rv_input, rv_input_0], dim=0)
         rv_feat_sem, rv_feat_ins = self.rv_net(rv_input)
 
-        point_rv_sem = self.rv2point(rv_feat_sem * attn_map_rv, pcds_sphere_coord)
+        if hasattr(self, 'attn_bev'):
+            prev, curr = torch.split(rv_feat_sem, 2)
+            rv_fused = self.attn_rv(curr, prev)
+            rv_feat_sem = torch.cat([prev, rv_fused], dim=1)
+            rv_feat_sem = self.fuse_rv_conv(rv_feat_sem)
+        
+        point_rv_sem = self.rv2point(rv_feat_sem, pcds_sphere_coord[:, :mapping_mat['n_0'][0], :, :].contiguous())
         
 
         # stage0
-        point_feat_sem = self.point_fusion_sem(point_feat_tmp, point_bev_sem, point_rv_sem) #TODO try point_feat_tmp_0 if point_feat_tmp is not good enough
+        point_feat_sem = self.point_fusion_sem(point_feat_temp_0, point_bev_sem, point_rv_sem) #TODO try point_feat_tmp_0 if point_feat_tmp is not good enough
         
 
         if self.pModel.auxiliary:
-            point_bev_ins = self.bev2point(bev_feat_ins * attn_map_bev, pcds_coord_wl)
-            point_rv_ins = self.rv2point(rv_feat_ins * attn_map_rv, pcds_sphere_coord)
+            if hasattr(self, 'attn_bev'):
+                prev_bev_ins, curr_bev_ins = torch.split(bev_feat_ins, 2)
+                bev_fused_ins = self.attn_bev_ins(curr_bev_ins, prev_bev_ins)
+                bev_feat_ins = torch.cat([curr_bev_ins, bev_fused_ins], dim=1)
+                bev_feat_ins = self.fuse_bev_conv_ins(bev_feat_ins)
+            point_bev_ins = self.bev2point(bev_feat_ins, pcds_coord_wl_0)
+            
+            if hasattr(self, 'attn_bev'):
+                prev_rv_ins, curr_rv_ins = torch.split(rv_feat_ins, 2)
+                bev_fused_ins = self.attn_rv_ins(curr_rv_ins, prev_rv_ins)
+                bev_feat_ins = torch.cat([curr_rv_ins, bev_fused_ins], dim=1)
+                bev_feat_ins = self.fuse_rv_conv_ins(bev_feat_ins)
+                
+            point_rv_ins = self.rv2point(bev_feat_ins, pcds_sphere_coord[:, :mapping_mat['n_0'][0], :, :].contiguous())
             pred_sem = self.pred_layer_sem(point_feat_sem).float()
 
             # ins branch
-            point_feat_ins = self.point_fusion_ins(point_feat_tmp, point_bev_ins, point_rv_ins) #TODO try point_feat_tmp_0 if point_feat_tmp is not good enough
+            point_feat_ins = self.point_fusion_ins(point_feat_temp_0, point_bev_ins, point_rv_ins) #TODO try point_feat_tmp_0 if point_feat_tmp is not good enough
             pred_offset = self.pred_layer_offset(point_feat_ins).float().squeeze(-1).transpose(1, 2).contiguous()
             pred_hmap = self.pred_layer_hmap(point_feat_ins).float().squeeze(1)
             preds_list = [(pred_sem, pred_offset, pred_hmap)]
@@ -175,14 +214,14 @@ class CFNet_Shifted(nn.Module):
             
             # BEV network
             bev_cfg_feat_1 = self.point2bev_cffe(point_feat_sem_1, pcds_coord_wl_reproj_1)
-            bev_feat_sem_final, bev_feat_ins_final = self.bev_cffe(bev_feat_sem * attn_map_bev, bev_cfg_feat_1)
+            bev_feat_sem_final, bev_feat_ins_final = self.bev_cffe(bev_feat_sem, bev_cfg_feat_1)
 
             point_bev_sem_cffe = self.bev2point_cffe(bev_feat_sem_final, pcds_coord_wl)
             point_bev_ins_cffe = self.bev2point_cffe(bev_feat_ins_final, pcds_coord_wl)
 
             # RV network
             rv_cfg_feat_1 = self.point2rv_cffe(point_feat_sem_1, pcds_sphere_coord_reproj_1)
-            rv_feat_sem_final, rv_feat_ins_final = self.rv_cffe(rv_feat_sem * attn_map_rv, rv_cfg_feat_1)
+            rv_feat_sem_final, rv_feat_ins_final = self.rv_cffe(rv_feat_sem, rv_cfg_feat_1)
 
             point_rv_sem_cffe = self.rv2point_cffe(rv_feat_sem_final, pcds_sphere_coord)
             point_rv_ins_cffe = self.rv2point_cffe(rv_feat_ins_final, pcds_sphere_coord)

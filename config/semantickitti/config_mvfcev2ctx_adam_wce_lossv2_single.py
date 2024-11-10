@@ -81,20 +81,20 @@ def get_config():
         time_embedding_dim = None
         n_past_pcls = n_past_steps
         attn_map = True
-        auxiliary=False
+        auxiliary=True
         cffe_used=False
         
         class AttnParam:
             class BEVParam:
                 class P2VParam:
                     type = 'models.networks.point2voxel.VMPModule'
-                    output_size = [General.Voxel.bev_shape[0] // 2, General.Voxel.bev_shape[1] // 2]
-                    scale_rate = [0.5, 0.5]
+                    output_size = General.Voxel.bev_shape[:2]
+                    scale_rate = [1, 1]
             class RVParam:
                 class P2VParam:
                         type = 'models.networks.point2voxel.VMPModule'
-                        output_size = [General.Voxel.rv_shape[0], General.Voxel.rv_shape[1] // 2]
-                        scale_rate = [1.0, 0.5]
+                        output_size = General.Voxel.rv_shape
+                        scale_rate = [1, 1]
             
 
         class BEVParam:

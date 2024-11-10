@@ -154,7 +154,7 @@ class CFNet_Shifted(nn.Module):
         bev_feat_sem, bev_feat_ins = self.bev_net(bev_input)
         
         if hasattr(self, 'attn_bev'):
-            prev, curr = torch.split(bev_feat_sem, 2)
+            prev, curr = torch.split(bev_feat_sem, bev_feat_sem.shape[0] // 2)
             bev_fused = self.attn_bev(curr, prev)
             bev_feat_sem = torch.cat([curr, bev_fused], dim=1)
             bev_feat_sem = self.fuse_bev_conv(bev_feat_sem)
@@ -168,7 +168,7 @@ class CFNet_Shifted(nn.Module):
         rv_feat_sem, rv_feat_ins = self.rv_net(rv_input)
 
         if hasattr(self, 'attn_bev'):
-            prev, curr = torch.split(rv_feat_sem, 2)
+            prev, curr = torch.split(rv_feat_sem, rv_feat_sem.shape[0] // 2)
             rv_fused = self.attn_rv(curr, prev)
             rv_feat_sem = torch.cat([prev, rv_fused], dim=1)
             rv_feat_sem = self.fuse_rv_conv(rv_feat_sem)
@@ -182,14 +182,14 @@ class CFNet_Shifted(nn.Module):
 
         if self.pModel.auxiliary:
             if hasattr(self, 'attn_bev'):
-                prev_bev_ins, curr_bev_ins = torch.split(bev_feat_ins, 2)
+                prev_bev_ins, curr_bev_ins = torch.split(bev_feat_ins, bev_feat_ins.shape[0] // 2)
                 bev_fused_ins = self.attn_bev_ins(curr_bev_ins, prev_bev_ins)
                 bev_feat_ins = torch.cat([curr_bev_ins, bev_fused_ins], dim=1)
                 bev_feat_ins = self.fuse_bev_conv_ins(bev_feat_ins)
             point_bev_ins = self.bev2point(bev_feat_ins, pcds_coord_wl_0)
             
             if hasattr(self, 'attn_bev'):
-                prev_rv_ins, curr_rv_ins = torch.split(rv_feat_ins, 2)
+                prev_rv_ins, curr_rv_ins = torch.split(rv_feat_ins, rv_feat_ins.shape[0] // 2)
                 bev_fused_ins = self.attn_rv_ins(curr_rv_ins, prev_rv_ins)
                 bev_feat_ins = torch.cat([curr_rv_ins, bev_fused_ins], dim=1)
                 bev_feat_ins = self.fuse_rv_conv_ins(bev_feat_ins)

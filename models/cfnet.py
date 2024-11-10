@@ -151,7 +151,7 @@ class CFNet_Shifted(nn.Module):
             bev_feat_sem = torch.cat([curr, bev_fused], dim=1)
             bev_feat_sem = self.fuse_bev_conv(bev_feat_sem)
 
-        point_bev_sem = self.bev2point(bev_feat_sem, pcds_coord_wl_0)
+        point_bev_sem = self.bev2point(bev_feat_sem, pcds_coord_wl)
         
 
         # RV network
@@ -165,20 +165,20 @@ class CFNet_Shifted(nn.Module):
             rv_feat_sem = torch.cat([prev, rv_fused], dim=1)
             rv_feat_sem = self.fuse_rv_conv(rv_feat_sem)
         
-        point_rv_sem = self.rv2point(rv_feat_sem, pcds_sphere_coord[:, :mapping_mat['n_0'][0], :, :].contiguous())
+        point_rv_sem = self.rv2point(rv_feat_sem, pcds_sphere_coord)
         
 
         # stage0
-        point_feat_sem = self.point_fusion_sem(point_feat_temp_0, point_bev_sem, point_rv_sem) #TODO try point_feat_tmp_0 if point_feat_tmp is not good enough
+        point_feat_sem = self.point_fusion_sem(point_feat_tmp, point_bev_sem, point_rv_sem) #TODO try point_feat_tmp_0 if point_feat_tmp is not good enough
         
 
         if self.pModel.auxiliary:
-            point_bev_ins = self.bev2point(bev_feat_ins, pcds_coord_wl_0)
-            point_rv_ins = self.rv2point(bev_feat_ins, pcds_sphere_coord[:, :mapping_mat['n_0'][0], :, :].contiguous())
+            point_bev_ins = self.bev2point(bev_feat_ins, pcds_coord_wl)
+            point_rv_ins = self.rv2point(bev_feat_ins, pcds_sphere_coord)
             pred_sem = self.pred_layer_sem(point_feat_sem).float()
 
             # ins branch
-            point_feat_ins = self.point_fusion_ins(point_feat_temp_0, point_bev_ins, point_rv_ins) #TODO try point_feat_tmp_0 if point_feat_tmp is not good enough
+            point_feat_ins = self.point_fusion_ins(point_feat_tmp, point_bev_ins, point_rv_ins) #TODO try point_feat_tmp_0 if point_feat_tmp is not good enough
             pred_offset = self.pred_layer_offset(point_feat_ins).float().squeeze(-1).transpose(1, 2).contiguous()
             pred_hmap = self.pred_layer_hmap(point_feat_ins).float().squeeze(1)
             preds_list = [(pred_sem, pred_offset, pred_hmap)]

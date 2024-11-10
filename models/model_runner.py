@@ -128,11 +128,11 @@ class ModelRunnerSemKITTI(trainer.ADDistTrainer):
         loss_dic = collections.OrderedDict()
         loss = 0
         for i in range(len(pred_list)):
-            if pred_list[i][0].shape[2] == mapping_mat['n_0'][0]:
-                pcds_offset = pcds_offset[:, :mapping_mat['n_0'][0]]
-                pcds_offset_raw = pcds_offset_raw[:, :mapping_mat['n_0'][0]]
-                pcds_ins_label = pcds_ins_label[:, :mapping_mat['n_0'][0]]
-                pcds_sem_label = pcds_sem_label[:, :mapping_mat['n_0'][0]]
+            # if pred_list[i][0].shape[2] == mapping_mat['n_0'][0]:
+            #     pcds_offset = pcds_offset[:, :mapping_mat['n_0'][0]]
+            #     pcds_offset_raw = pcds_offset_raw[:, :mapping_mat['n_0'][0]]
+            #     pcds_ins_label = pcds_ins_label[:, :mapping_mat['n_0'][0]]
+            #     pcds_sem_label = pcds_sem_label[:, :mapping_mat['n_0'][0]]
             if len(pred_list[i]) <= 1:
                 loss_pano = self.panoptic_loss(pred_list[i][0], None, None, pcds_offset, pcds_ins_label, pcds_sem_label)
                 loss_pano_raw = self.panoptic_loss(pred_list_raw[i][0], None, None, pcds_offset_raw, pcds_ins_label, pcds_sem_label)

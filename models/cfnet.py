@@ -173,8 +173,11 @@ class CFNet_Shifted(nn.Module):
         
 
         if self.pModel.auxiliary:
-            point_bev_ins = self.bev2point(bev_feat_ins, pcds_coord_wl)
-            point_rv_ins = self.rv2point(bev_feat_ins, pcds_sphere_coord)
+            prev_bev_ins, curr_bev_ins = torch.split(bev_feat_ins, bev_feat_ins.shape[0] // 2)
+            prev_rv_ins, curr_rv_ins = torch.split(rv_feat_ins, rv_feat_ins.shape[0] // 2)
+            
+            point_bev_ins = self.bev2point(prev_bev_ins, pcds_coord_wl)
+            point_rv_ins = self.rv2point(prev_rv_ins, pcds_sphere_coord)
             pred_sem = self.pred_layer_sem(point_feat_sem).float()
 
             # ins branch

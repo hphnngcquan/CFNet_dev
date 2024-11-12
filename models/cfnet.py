@@ -56,12 +56,12 @@ class CFNet_Shifted(nn.Module):
             self.point2rv_attn = get_module(attn_cfg.RVParam.P2VParam)
             self.attn_bev = SpatialAttention_mtf()
             self.attn_rv = SpatialAttention_mtf()
-            self.fuse_bev_conv = nn.Sequential(
-                backbone.bn_conv3x3_bn_relu(bev_base_channels[2] * 2, bev_base_channels[2]),               
-            )
-            self.fuse_rv_conv = nn.Sequential(
-                backbone.bn_conv3x3_bn_relu(bev_base_channels[2] * 2, bev_base_channels[2]),               
-            )
+            # self.fuse_bev_conv = nn.Sequential(
+            #     backbone.bn_conv3x3_bn_relu(bev_base_channels[2] * 2, bev_base_channels[2]),               
+            # )
+            # self.fuse_rv_conv = nn.Sequential(
+            #     backbone.bn_conv3x3_bn_relu(bev_base_channels[2] * 2, bev_base_channels[2]),               
+            # )
             
         # BEV network
         self.point2bev = get_module(bev_net_cfg.P2VParam)
@@ -147,9 +147,9 @@ class CFNet_Shifted(nn.Module):
         
         if hasattr(self, 'attn_bev'):
             prev, curr = torch.split(bev_feat_sem, bev_feat_sem.shape[0] // 2)
-            bev_fused = self.attn_bev(curr, prev)
-            bev_feat_sem = torch.cat([curr, bev_fused], dim=1)
-            bev_feat_sem = self.fuse_bev_conv(bev_feat_sem)
+            bev_feat_sem = self.attn_bev(curr, prev)
+            # bev_feat_sem = torch.cat([curr, bev_fused], dim=1)
+            # bev_feat_sem = self.fuse_bev_conv(bev_feat_sem)
 
         point_bev_sem = self.bev2point(bev_feat_sem, pcds_coord_wl)
         
@@ -161,9 +161,9 @@ class CFNet_Shifted(nn.Module):
 
         if hasattr(self, 'attn_bev'):
             prev, curr = torch.split(rv_feat_sem, rv_feat_sem.shape[0] // 2)
-            rv_fused = self.attn_rv(curr, prev)
-            rv_feat_sem = torch.cat([prev, rv_fused], dim=1)
-            rv_feat_sem = self.fuse_rv_conv(rv_feat_sem)
+            rv_feat_sem = self.attn_rv(curr, prev)
+            # rv_feat_sem = torch.cat([prev, rv_fused], dim=1)
+            # rv_feat_sem = self.fuse_rv_conv(rv_feat_sem)
         
         point_rv_sem = self.rv2point(rv_feat_sem, pcds_sphere_coord)
         

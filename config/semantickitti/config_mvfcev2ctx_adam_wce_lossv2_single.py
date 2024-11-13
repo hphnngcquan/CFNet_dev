@@ -82,7 +82,7 @@ def get_config():
         n_past_pcls = n_past_steps
         attn_map = True
         auxiliary=True
-        cffe_used=False
+        cffe_used=True
         
         class AttnParam:
             class BEVParam:

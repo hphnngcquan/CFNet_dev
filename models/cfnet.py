@@ -368,14 +368,14 @@ class CFNet_Shifted(nn.Module):
             
             # BEV network
             bev_cfg_feat_1 = self.point2bev_cffe(point_feat_sem_1, pcds_coord_wl_reproj_1)
-            bev_feat_sem_final, bev_feat_ins_final = self.bev_cffe(bev_feat_sem, bev_cfg_feat_1)
+            bev_feat_sem_final, bev_feat_ins_final = self.bev_cffe(bev_feat_sem * attn_map_bev, bev_cfg_feat_1)
 
             point_bev_sem_cffe = self.bev2point_cffe(bev_feat_sem_final, pcds_coord_wl)
             point_bev_ins_cffe = self.bev2point_cffe(bev_feat_ins_final, pcds_coord_wl)
 
             # RV network
             rv_cfg_feat_1 = self.point2rv_cffe(point_feat_sem_1, pcds_sphere_coord_reproj_1)
-            rv_feat_sem_final, rv_feat_ins_final = self.rv_cffe(rv_feat_sem, rv_cfg_feat_1)
+            rv_feat_sem_final, rv_feat_ins_final = self.rv_cffe(rv_feat_sem * attn_map_rv, rv_cfg_feat_1)
 
             point_rv_sem_cffe = self.rv2point_cffe(rv_feat_sem_final, pcds_sphere_coord)
             point_rv_ins_cffe = self.rv2point_cffe(rv_feat_ins_final, pcds_sphere_coord)

@@ -5,7 +5,7 @@ import torch.nn.functional as F
 import numpy as np
 
 from .networks import backbone
-from .networks.fusion_module import SpatialAttention_mtf
+from .networks.fusion_module import SpatialAttention_mtf, ChannelAttention
 from . import common_utils
 from datasets.utils import save_feature_map
 from utils.config_parser import get_module
@@ -51,17 +51,10 @@ class CFNet_Shifted(nn.Module):
             backbone.conv1x1_bn_relu(bev_base_channels[0], bev_base_channels[0])
         )
         if attn_map:
-            attn_cfg = self.pModel.AttnParam
-            self.point2bev_attn = get_module(attn_cfg.BEVParam.P2VParam)
-            self.point2rv_attn = get_module(attn_cfg.RVParam.P2VParam)
-            self.attn_bev = SpatialAttention_mtf()
-            self.attn_rv = SpatialAttention_mtf()
-            # self.fuse_bev_conv = nn.Sequential(
-            #     backbone.bn_conv3x3_bn_relu(bev_base_channels[2] * 2, bev_base_channels[2]),               
-            # )
-            # self.fuse_rv_conv = nn.Sequential(
-            #     backbone.bn_conv3x3_bn_relu(bev_base_channels[2] * 2, bev_base_channels[2]),               
-            # )
+            self.ch_attn_bev = ChannelAttention(bev_base_channels[2])
+            self.ch_attn_rv = ChannelAttention(bev_base_channels[2])
+            self.sp_attn_bev = SpatialAttention_mtf()
+            self.sp_attn_rv = SpatialAttention_mtf()
             
         # BEV network
         self.point2bev = get_module(bev_net_cfg.P2VParam)
@@ -128,56 +121,36 @@ class CFNet_Shifted(nn.Module):
         '''
         # start = time.perf_counter()
         pcds_coord_wl = pcds_coord[:, :, :2].contiguous()
-        pcds_coord_wl_0 = pcds_coord[:, :mapping_mat['n_0'][0], :2].contiguous()
-        
-
         point_feat_tmp = self.point_pre(pcds_xyzi)
-
-        if hasattr(self, 'attn_bev'):
-            assert pcds_coord_wl_0.shape[1] == pcds_sphere_coord[:, :mapping_mat['n_0'][0], :, :].shape[1] == mapping_mat['n_0'][0]
-            # mapping point_feat_tmp
-            point_feat_temp_0 = point_feat_tmp[:,:,:mapping_mat['n_0'][0],:].clone()
-            bev_input_0 = self.point2bev_attn(point_feat_temp_0, pcds_coord_wl_0) 
-            rv_input_0 = self.point2rv_attn(point_feat_temp_0, pcds_sphere_coord[:, :mapping_mat['n_0'][0], :, :].contiguous())
         
         # BEV network
         bev_input = self.point2bev(point_feat_tmp, pcds_coord_wl)
-        bev_input = torch.cat([bev_input, bev_input_0], dim=0)
         bev_feat_sem, bev_feat_ins = self.bev_net(bev_input)
         
-        if hasattr(self, 'attn_bev'):
-            prev, curr = torch.split(bev_feat_sem, bev_feat_sem.shape[0] // 2)
-            bev_feat_sem = self.attn_bev(curr, prev)
-            # bev_feat_sem = torch.cat([curr, bev_fused], dim=1)
-            # bev_feat_sem = self.fuse_bev_conv(bev_feat_sem)
+        if hasattr(self, 'ch_attn_bev'):
+            ch_bev_feat_sem = self.ch_attn_bev(bev_feat_sem)
+            bev_feat_sem = self.sp_attn_bev(ch_bev_feat_sem)
 
         point_bev_sem = self.bev2point(bev_feat_sem, pcds_coord_wl)
         
-
         # RV network
         rv_input = self.point2rv(point_feat_tmp, pcds_sphere_coord)
-        rv_input = torch.cat([rv_input, rv_input_0], dim=0)
         rv_feat_sem, rv_feat_ins = self.rv_net(rv_input)
 
-        if hasattr(self, 'attn_bev'):
-            prev, curr = torch.split(rv_feat_sem, rv_feat_sem.shape[0] // 2)
-            rv_feat_sem = self.attn_rv(curr, prev)
-            # rv_feat_sem = torch.cat([prev, rv_fused], dim=1)
-            # rv_feat_sem = self.fuse_rv_conv(rv_feat_sem)
+        if hasattr(self, 'ch_attn_rv'):
+            ch_rv_feat_sem = self.ch_attn_rv(rv_feat_sem)
+            rv_feat_sem = self.sp_attn_rv(ch_rv_feat_sem)
         
         point_rv_sem = self.rv2point(rv_feat_sem, pcds_sphere_coord)
         
-
         # stage0
         point_feat_sem = self.point_fusion_sem(point_feat_tmp, point_bev_sem, point_rv_sem) #TODO try point_feat_tmp_0 if point_feat_tmp is not good enough
         
 
         if self.pModel.auxiliary:
-            prev_bev_ins, curr_bev_ins = torch.split(bev_feat_ins, bev_feat_ins.shape[0] // 2)
-            prev_rv_ins, curr_rv_ins = torch.split(rv_feat_ins, rv_feat_ins.shape[0] // 2)
             
-            point_bev_ins = self.bev2point(prev_bev_ins, pcds_coord_wl)
-            point_rv_ins = self.rv2point(prev_rv_ins, pcds_sphere_coord)
+            point_bev_ins = self.bev2point(bev_feat_ins, pcds_coord_wl)
+            point_rv_ins = self.rv2point(rv_feat_ins, pcds_sphere_coord)
             pred_sem = self.pred_layer_sem(point_feat_sem).float()
 
             # ins branch

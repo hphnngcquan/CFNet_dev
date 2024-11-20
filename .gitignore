@@ -12,3 +12,4 @@ Pipfile
 .mypy_cache/
 data/
 data/*
+*.cpkt

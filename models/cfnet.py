@@ -199,3 +199,15 @@ class CFNet_Shifted(nn.Module):
         # self.total_time += end - start
         # print('total time:', self.total_time)
         return preds_list
+    def freeze_part_(self):
+        for module in [
+            self.point_pre, self.point2bev, self.bev_net, self.bev2point,
+            self.point2rv, self.rv_net, self.rv2point, self.point_fusion_sem,
+            self.pred_layer_sem, self.point_fusion_ins, self.pred_layer_offset,
+            self.pred_layer_hmap,
+            getattr(self, 'ch_attn_bev', None), getattr(self, 'sp_attn_bev', None),
+            getattr(self, 'ch_attn_rv', None), getattr(self, 'sp_attn_rv', None)
+        ]:
+            if module is not None:
+                for param in module.parameters():
+                    param.requires_grad = False

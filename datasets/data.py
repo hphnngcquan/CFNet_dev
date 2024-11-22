@@ -274,6 +274,9 @@ class DataloadTrain(Dataset):
         # copy-paste augmentation
         if self.cp_aug is not None:
             pcds, pcds_label_use, pcds_ins_label = self.cp_aug(pcds, final_pcds_label_use[:mapping_mat['n_0']], final_pcds_ins_label[:mapping_mat['n_0']])
+        else:
+            pcds, pcds_label_use, pcds_ins_label = pcds, final_pcds_label_use[:mapping_mat['n_0']], final_pcds_ins_label[:mapping_mat['n_0']]
+            
         
         # merge pcds and labels
         pcds_total = np.concatenate((pcds, pcds_label_use[:, np.newaxis], pcds_ins_label[:, np.newaxis]), axis=1)

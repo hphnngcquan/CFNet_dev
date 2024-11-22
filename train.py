@@ -107,6 +107,7 @@ def main(args, config):
     if (args.pretrain_model != None) and (os.path.exists(args.pretrain_model)):
         print('Load pretrain model: {}'.format(args.pretrain_model))
         model.load_state_dict(torch.load(args.pretrain_model, map_location='cpu')['model_dic'], strict=False)
+        # model.freeze_part_()
     
     model_trainer.fit(model, train_dataloader=train_loader, val_dataloader=val_loader, ckpt_path=args.resume_ckpt, find_unused_parameters=False)
 

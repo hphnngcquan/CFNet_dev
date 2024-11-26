@@ -43,10 +43,12 @@ def main(args, config):
     else:
         # define dataloader
         test_dataset = get_module(type=pDataset.Test.type, config=pDataset.Test)
+        test_sampler = DistributedSampler(test_dataset)
         loader = DataLoader(test_dataset,
                                 batch_size=1,
-                                shuffle=False,
+                                shuffle=(test_sampler is None),
                                 num_workers=pDataset.Test.num_workers,
+                                sampler=test_sampler,
                                 pin_memory=True,
                                 prefetch_factor=2,
                                 persistent_workers=True)

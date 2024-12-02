@@ -13,3 +13,6 @@ Pipfile
 data/
 data/*
 *.cpkt
+metric.yaml
+untracked*/
+*.zip

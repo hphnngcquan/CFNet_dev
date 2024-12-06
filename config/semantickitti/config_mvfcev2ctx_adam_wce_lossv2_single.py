@@ -80,6 +80,8 @@ def get_config():
         point_feat_out_channels = 64
         time_embedding_dim = None
         n_past_pcls = n_past_steps
+        RV_used = True
+        BEV_used = False
         attn_map = True
         auxiliary=True
         cffe_used=True

@@ -54,22 +54,15 @@ def random_f(r):
 
 
 class CutPaste:
-    def __init__(self, object_dir, paste_max_obj_num, road_idx=[9]):
+    def __init__(self, object_dir, paste_max_obj_num, road_idx=[11, 13]):
         self.object_dir = object_dir
-        self.sub_dirs = ('car', 'other-vehicle', 'truck', 'motorcyclist', 'motorcycle', 'person', 'bicycle', 'bicyclist')
-        '''
-        other-vehicle: 7014
-        bicycle: 4063
-        motorcyclist: 530
-        bicyclist: 1350
-        motorcycle: 2774
-        truck: 2514
-        person: 6764
-        '''
+        self.sub_dirs = ('barrier', 'bicycle', 'bus', 'car', 'construction_vehicle', 'motorcycle', 'pedestrian', 
+                         'traffic_cone', 'trailer', 'truck',)
+
         self.sub_dirs_dic = {}
         for fp in self.sub_dirs:
             fpath = os.path.join(self.object_dir, fp)
-            fname_list = [os.path.join(fpath, x) for x in os.listdir(fpath) if (x.endswith('.npz')) and (x.split('_')[0] != '08')]
+            fname_list = [os.path.join(fpath, x) for x in os.listdir(fpath) if (x.endswith('.npz'))]
             print('Load {0}: {1}'.format(fp, len(fname_list)))
             fname_list = sorted(fname_list)
             self.sub_dirs_dic[fp] = fname_list

@@ -92,7 +92,7 @@ class PanopticLossv1(nn.Module):
             if 'class_weight' in loss_seg_dic:
                 class_weight = torch.FloatTensor(loss_seg_dic['class_weight'])
             else:
-                with open('datasets/semantic-kitti.yaml', 'r') as f:
+                with open('datasets/nuscenes.yaml', 'r') as f:
                     task_cfg = yaml.safe_load(f)
                     content = torch.zeros(len(task_cfg['learning_ignore']), dtype=torch.float32)
                     for cl, freq in task_cfg["content"].items():
@@ -162,7 +162,7 @@ class PanopticLossv2(nn.Module):
             if 'class_weight' in loss_seg_dic:
                 class_weight = torch.FloatTensor(loss_seg_dic['class_weight'])
             else:
-                with open('datasets/semantic-kitti.yaml', 'r') as f:
+                with open('datasets/nuscenes.yaml', 'r') as f:
                     task_cfg = yaml.safe_load(f)
                     content = torch.zeros(len(task_cfg['learning_ignore']), dtype=torch.float32)
                     for cl, freq in task_cfg["content"].items():
@@ -232,7 +232,7 @@ class PanopticLossv2_single(nn.Module):
             if 'class_weight' in loss_seg_dic:
                 class_weight = torch.FloatTensor(loss_seg_dic['class_weight'])
             else:
-                with open('datasets/semantic-kitti.yaml', 'r') as f:
+                with open('datasets/nuscenes.yaml', 'r') as f:
                     task_cfg = yaml.safe_load(f)
                     content = torch.zeros(len(task_cfg['learning_ignore']), dtype=torch.float32)
                     for cl, freq in task_cfg["content"].items():

@@ -8,11 +8,11 @@ def get_config():
         name = reduce(lambda x,y:os.path.join(x,y), __name__.rsplit("/")[-1].split('.')[1:])
         batch_size_per_gpu = 1
 
-        OffsetDir = './data/OffsetKITTI/dataset/sequences'
-        SeqDir = './data/SemanticKITTI/dataset/sequences'
-        category_list = ['car', 'bicycle', 'motorcycle', 'truck', 'other-vehicle', 'person', 'bicyclist', 'motorcyclist',
-                        'road', 'parking', 'sidewalk', 'other-ground', 'building', 'fence', 'vegetation', 'trunk',
-                        'terrain', 'pole', 'traffic-sign']
+        OffsetDir = 'NONE'
+        SeqDir = './data/nuscenes/nuscenes_dataset/sequences'
+        category_list = ['barrier', 'bicycle', 'bus', 'car', 'construction_vehicle', 'motorcycle', 'pedestrian', 
+                         'traffic_cone', 'trailer', 'truck', 
+                         'driveable_surface', 'other_flat', 'sidewalk', 'terrain', 'manmade', 'vegetation']
         
         center_type = 'axis'
         point_nms_dic = dict(K=100, score_thresh=0.2, dist_thresh=0.8, vote_thresh=0.4)
@@ -29,7 +29,7 @@ def get_config():
         class Train:
             type = 'datasets.data.DataloadTrain'
             num_workers = 8
-            frame_point_num = 130000
+            frame_point_num = 60000
             align_used = True
             n_past_pcls = n_past_steps
             OffsetDir = General.OffsetDir
@@ -38,7 +38,7 @@ def get_config():
             center_type = General.center_type
             class CopyPasteAug:
                 is_use = True
-                ObjBackDir = './data/object_bank_semkitti'
+                ObjBackDir = './data/nusc_bank'
                 paste_max_obj_num = 20
             class AugParam:
                 noise_mean = 0
@@ -50,18 +50,7 @@ def get_config():
         class Val:
             type = 'datasets.data.DataloadVal'
             num_workers = 8
-            frame_point_num = 130000
-            align_used = True
-            n_past_pcls = n_past_steps
-            OffsetDir = General.OffsetDir
-            SeqDir = General.SeqDir
-            Voxel = General.Voxel
-            center_type = General.center_type
-        
-        class Test:
-            type = 'datasets.data.DataloadTest'
-            num_workers = 8
-            frame_point_num = 130000
+            frame_point_num = 60000
             align_used = True
             n_past_pcls = n_past_steps
             OffsetDir = General.OffsetDir

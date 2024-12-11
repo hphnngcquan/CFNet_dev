@@ -219,9 +219,9 @@ class PanopticEval:
       output_dict[class_str]["IoU"] = iou
     
     # split things and stuff
-    things = ['car', 'bicycle', 'motorcycle', 'truck', 'other-vehicle', 'person', 'bicyclist', 'motorcyclist']
-    stuff = ['road', 'parking', 'sidewalk', 'other-ground', 'building', 'fence', 'vegetation', 'trunk',
-    'terrain', 'pole', 'traffic-sign']
+    things = ['noise', 'barrier', 'bicycle', 'bus', 'car', 'construction_vehicle', 'motorcycle', 'pedestrian', 
+                         'traffic_cone', 'trailer', 'truck',]
+    stuff = ['driveable_surface', 'other_flat', 'sidewalk', 'terrain', 'manmade', 'vegetation']
     all_classes = things + stuff
 
     PQ_all = np.mean([float(output_dict[c]["PQ"]) for c in all_classes])
@@ -248,4 +248,15 @@ class PanopticEval:
     result_dic["pq_things"] = float(PQ_things)
     result_dic["rq_things"] = float(RQ_things)
     result_dic["sq_things"] = float(SQ_things)
+    
+    print('|        |   IoU   |   PQ   |   RQ   |  SQ   |')
+    for k, v in output_dict.items():
+        print('|{}| {:.4f} | {:.4f} | {:.4f} | {:.4f} |'.format(
+            k.ljust(8)[-8:], v['miou'], v['pq'], v['rq'], v['sq']))
+    print('True Positive: ')
+    print('\t|\t'.join([str(x) for x in self.pan_tp]))
+    print('False Positive: ')
+    print('\t|\t'.join([str(x) for x in self.pan_fp]))
+    print('False Negative: ')
+    print('\t|\t'.join([str(x) for x in self.pan_fn]))
     return result_dic

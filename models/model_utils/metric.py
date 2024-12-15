@@ -219,7 +219,7 @@ class PanopticEval:
       output_dict[class_str]["IoU"] = iou
     
     # split things and stuff
-    things = ['noise', 'barrier', 'bicycle', 'bus', 'car', 'construction_vehicle', 'motorcycle', 'pedestrian', 
+    things = ['barrier', 'bicycle', 'bus', 'car', 'construction_vehicle', 'motorcycle', 'pedestrian', 
                          'traffic_cone', 'trailer', 'truck',]
     stuff = ['driveable_surface', 'other_flat', 'sidewalk', 'terrain', 'manmade', 'vegetation']
     all_classes = things + stuff
@@ -252,7 +252,7 @@ class PanopticEval:
     print('|        |   IoU   |   PQ   |   RQ   |  SQ   |')
     for k, v in output_dict.items():
         print('|{}| {:.4f} | {:.4f} | {:.4f} | {:.4f} |'.format(
-            k.ljust(8)[-8:], v['miou'], v['pq'], v['rq'], v['sq']))
+            k.ljust(8)[-8:], v['IoU'], v['PQ'], v['RQ'], v['SQ']))
     print('True Positive: ')
     print('\t|\t'.join([str(x) for x in self.pan_tp]))
     print('False Positive: ')

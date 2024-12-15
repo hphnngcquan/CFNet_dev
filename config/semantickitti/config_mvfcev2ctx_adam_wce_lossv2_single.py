@@ -71,7 +71,7 @@ def get_config():
         n_past_pcls = n_past_steps
         attn_map = True
         auxiliary=True
-        cffe_used=True
+        cffe_used=False
         
             
 

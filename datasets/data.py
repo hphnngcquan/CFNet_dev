@@ -508,7 +508,7 @@ class DataloadVal(Dataset):
         for i, _ in enumerate(prev_pcds_list):
             prev_pcds_total_n = np.concatenate((prev_pcds_list[i], prev_pcds_label_use_list[i][:, np.newaxis], prev_pcds_ins_label_list[i][:, np.newaxis]), axis=1)
             if prev_pcds_total_n.shape[0] == (mapping_mat['n_2'] - mapping_mat['n_1']):
-                choice = np.random.choice(prev_pcds_total_n.shape[0], self.frame_point_num * (self.n_past_pcls - 1), replace=True)
+                choice = np.random.choice(prev_pcds_total_n.shape[0], self.frame_point_num, replace=True)
                 prev_pcds_total_n = prev_pcds_total_n[choice]
             prev_pcds_total.append(prev_pcds_total_n)
         
@@ -741,7 +741,7 @@ class DataloadTest(Dataset):
         for i, _ in enumerate(prev_pcds_list):
             prev_pcds_total_n = np.concatenate((prev_pcds_list[i], prev_pcds_label_use_list[i][:, np.newaxis], prev_pcds_ins_label_list[i][:, np.newaxis]), axis=1)
             if prev_pcds_total_n.shape[0] == (mapping_mat['n_2'] - mapping_mat['n_1']):
-                choice = np.random.choice(prev_pcds_total_n.shape[0], self.frame_point_num * (self.n_past_pcls - 1), replace=True)
+                choice = np.random.choice(prev_pcds_total_n.shape[0], self.frame_point_num, replace=True)
                 prev_pcds_total_n = prev_pcds_total_n[choice]
             prev_pcds_total.append(prev_pcds_total_n)
         

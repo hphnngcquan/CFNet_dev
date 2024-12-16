@@ -220,7 +220,12 @@ class ModelRunnerSemKITTI(trainer.ADDistTrainer):
             record_dic = collections.OrderedDict()
             record_dic['validation_sample_number'] = len(fname_set)
             for i in range(len(criterion_pano_list)):
-                metric_pano = criterion_pano_list[i].get_metric()
+                metric_pano, out_dict = criterion_pano_list[i].get_metric()
+                self.log_str(f"i = {i}")
+                self.log_str('|        |   IoU   |   PQ   |   RQ   |  SQ   |')
+                for k, v in out_dict.items():
+                    self.log_str('|{}| {:.4f} | {:.4f} | {:.4f} | {:.4f} |'.format(
+                        k.ljust(8)[-8:], v['IoU'], v['PQ'], v['RQ'], v['SQ']))
                 for key in metric_pano:
                     record_dic["{}_{}".format(key, i)] = metric_pano[key]
             # Save result metrics

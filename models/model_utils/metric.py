@@ -249,14 +249,14 @@ class PanopticEval:
     result_dic["rq_things"] = float(RQ_things)
     result_dic["sq_things"] = float(SQ_things)
     
-    print('|        |   IoU   |   PQ   |   RQ   |  SQ   |')
-    for k, v in output_dict.items():
-        print('|{}| {:.4f} | {:.4f} | {:.4f} | {:.4f} |'.format(
-            k.ljust(8)[-8:], v['IoU'], v['PQ'], v['RQ'], v['SQ']))
+    # print('|        |   IoU   |   PQ   |   RQ   |  SQ   |')
+    # for k, v in output_dict.items():
+    #     print('|{}| {:.4f} | {:.4f} | {:.4f} | {:.4f} |'.format(
+    #         k.ljust(8)[-8:], v['IoU'], v['PQ'], v['RQ'], v['SQ']))
     print('True Positive: ')
     print('\t|\t'.join([str(x) for x in self.pan_tp]))
     print('False Positive: ')
     print('\t|\t'.join([str(x) for x in self.pan_fp]))
     print('False Negative: ')
     print('\t|\t'.join([str(x) for x in self.pan_fn]))
-    return result_dic
+    return result_dic, output_dict
